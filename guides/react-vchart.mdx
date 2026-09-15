@@ -1,7 +1,7 @@
 ---
-title: "Using VChart with React via react-vchart"
+title: "Building React Data Charts with @visactor/react-vchart"
 sidebarTitle: "React"
-description: "Render VChart charts in React apps using @visactor/react-vchart with typed chart components, the spec prop, onReady callback, and ref-based instance access."
+description: "Render VChart charts in React using @visactor/react-vchart with typed components, the spec prop, onReady callback, and ref-based instance access."
 ---
 
 `@visactor/react-vchart` is the official React wrapper for VChart. It offers two complementary patterns: a **spec-driven** approach via the `<VChart>` component that accepts any VChart JSON spec, and a set of **typed chart components** (e.g. `<BarChart>`, `<LineChart>`, `<PieChart>`) that expose spec fields directly as React props for a more idiomatic API. Both patterns internally manage chart lifecycle (create → render → update → release) and re-render reactively when props change.
@@ -175,22 +175,22 @@ export const MarketShareChart: React.FC = () => (
 
 <CardGroup cols={3}>
   <Card title="Basic">
-    `BarChart`, `LineChart`, `AreaChart`, `ScatterChart`, `PieChart`, `RoseChart`
+    `BarChart`, `LineChart`, `AreaChart`, `ScatterChart`, `PieChart`, `RoseChart`, `RadarChart`, `FunnelChart`
   </Card>
   <Card title="Statistical">
     `HistogramChart`, `BoxPlotChart`, `WaterfallChart`, `RangeColumnChart`, `RangeAreaChart`, `HeatmapChart`
   </Card>
   <Card title="Relational">
-    `SankeyChart`, `TreemapChart`, `SunburstChart`, `CirclePackingChart`, `RadarChart`, `CorrelationChart`
+    `SankeyChart`, `TreemapChart`, `SunburstChart`, `CirclePackingChart`, `CorrelationChart`, `VennChart`
   </Card>
   <Card title="Progress & Gauge">
     `CircularProgressChart`, `LinearProgressChart`, `GaugeChart`, `LiquidChart`
   </Card>
-  <Card title="Text & Map">
-    `WordCloudChart`, `MapChart`
+  <Card title="Text, Map & Other">
+    `WordCloudChart`, `MapChart`, `SequenceChart`, `MosaicChart`, `PictogramChart`, `CommonChart`
   </Card>
   <Card title="3D (extension)">
-    `Bar3dChart`, `Pie3dChart`, `Funnel3dChart`, `Histogram3dChart`, `WordCloud3dChart`
+    `Bar3dChart`, `Pie3dChart`, `Funnel3dChart`, `Histogram3dChart`, `WordCloud3dChart`, `RangeColumn3dChart`
   </Card>
 </CardGroup>
 

@@ -1,5 +1,5 @@
 ---
-title: "Adding Interactions to VChart Visualizations"
+title: "Adding Interactions and Selections to VChart Charts"
 sidebarTitle: "Interactions"
 description: "Learn how to add hover, select, and highlight interactions to VChart charts using the spec interactions array and modular trigger registration."
 ---
@@ -69,7 +69,7 @@ VChart.useRegisters([
 ```
 
 <Note>
-  When you import from the default `@visactor/vchart` entry (which re-exports `vchart-all`), all standard interactions including `registerElementActive`, `registerElementActiveByLegend`, `registerElementHighlightByLegend`, `registerElementHighlightByName`, `registerElementHighlightByGroup`, and `registerElementHighlightByKey` are pre-registered. You only need explicit registration when using the selective import pattern for smaller bundles.
+  When you import from the default `@visactor/vchart` entry (which re-exports `vchart-all`), the following interactions are pre-registered: `registerElementActive`, `registerElementActiveByLegend`, `registerElementHighlightByLegend`, `registerElementHighlightByName`, `registerElementHighlightByGroup`, and `registerElementHighlightByKey`. Note that `registerElementHighlight` and `registerElementSelect` are **not** pre-registered and must always be explicitly added when using the selective import pattern.
 </Note>
 
 ## Enabling Interactions via Spec

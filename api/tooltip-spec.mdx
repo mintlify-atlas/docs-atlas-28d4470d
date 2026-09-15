@@ -224,7 +224,7 @@ Each active type can have independently configured `title` and `content`.
 <ParamField path="group" type="IGroupTooltipPattern">
   Content pattern for **group tooltips**. Extends `ITooltipPattern` with
   `triggerMark` to specify which mark type triggers the group display (e.g.,
-  `"line"`, `"area"`, `"bar"`). Since v1.11.0.
+  `"line"`, `"area"`, `"point"`, `"bar"`). Since v1.11.0.
 </ParamField>
 
 ### Tooltip Pattern Fields (`ITooltipPattern`)
@@ -317,8 +317,8 @@ For fully custom tooltip rendering, implement the `handler` interface:
     handler: {
       showTooltip: (activeType, tooltipData, params) => {
         // render your custom tooltip
-        // return TooltipResult to signal success/failure
-        return 'not-empty';
+        // return TooltipResult.success (0) on success, TooltipResult.failed (1) on failure
+        return TooltipResult.success;
       },
       hideTooltip: (params) => {
         // hide your custom tooltip
@@ -331,7 +331,7 @@ For fully custom tooltip rendering, implement the `handler` interface:
   ```
 
   The `ITooltipHandlerSpec` interface:
-  - `showTooltip(activeType, tooltipData, params)` — called to display a tooltip. Return `"not-empty"` on success.
+  - `showTooltip(activeType, tooltipData, params)` — called to display a tooltip. Return `TooltipResult.success` (0) on success or `TooltipResult.failed` (1) on failure.
   - `hideTooltip(params)` — called to hide the tooltip.
   - `release()` — called when the chart is destroyed; release DOM elements and listeners.
   - `isTooltipShown?()` — optional; queried before showing to avoid re-renders.

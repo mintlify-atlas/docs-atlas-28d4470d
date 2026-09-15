@@ -136,8 +136,8 @@ Sunburst charts display hierarchical data as concentric rings. The root node occ
 | `centerY` | `number` | Chart center y-offset (px) |
 | `startAngle` | `number` | Start angle in degrees (default `-90`) |
 | `endAngle` | `number` | End angle in degrees |
-| `innerRadius` | `number \| string` | Innermost ring inner radius |
-| `outerRadius` | `number \| string` | Outermost ring outer radius |
+| `innerRadius` | `number \| number[]` | Innermost ring inner radius (per-level array supported) |
+| `outerRadius` | `number \| number[]` | Outermost ring outer radius (per-level array supported) |
 
 ```ts
 import { registerSunburstChart } from '@visactor/vchart';
@@ -173,7 +173,7 @@ const spec = {
   valueField: 'value',
   innerRadius: 0,
   outerRadius: 0.85,
-  label: { visible: true, layout: { align: 'arc' } }
+  label: { visible: true }
 };
 ```
 

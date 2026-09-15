@@ -97,12 +97,12 @@ VChart.ThemeManager.registerTheme('brandDark', {
 });
 ```
 
-### `VChart.ThemeManager.getTheme(name?)`
+### `VChart.ThemeManager.getTheme(name)`
 
 Returns the raw (unprocessed) `ITheme` object for the given theme name.
 
-<ParamField path="name" type="string">
-  The theme name to look up. Defaults to the current theme name when omitted.
+<ParamField path="name" type="string" required>
+  The registered theme name to look up (e.g. `'light'`, `'dark'`, `'myBrand'`).
 </ParamField>
 
 **Returns:** `ITheme`

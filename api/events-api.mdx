@@ -1,5 +1,5 @@
 ---
-title: "VChart Event API: on, off, and Event Types"
+title: "VChart Events API: on, off, Event Types, and Callbacks"
 sidebarTitle: "Events API"
 description: "Reference for VChart's on/off event listener API, the full EventType catalogue, EventQuery filter shape, and ExtendEventParam callback fields."
 ---
@@ -400,8 +400,8 @@ chart.on('animationFinished', () => {
   console.log('All entry animations complete — safe to export');
 });
 
-chart.on('layoutEnd', (params) => {
-  console.log('Layout finished, regions:', params.elements);
+chart.on('afterLayout', (params) => {
+  console.log('Layout finished, elements:', params.elements);
 });
 ```
 

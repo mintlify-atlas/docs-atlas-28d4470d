@@ -1,7 +1,7 @@
 ---
-title: "Theming VChart with Built-in and Custom Themes"
+title: "VChart Theming: Built-in Themes and ThemeManager API"
 sidebarTitle: "Themes"
-description: "Learn how to use VChart's built-in light theme, register custom themes with ThemeManager, apply them globally or per-instance, and design your own token system."
+description: "Use VChart's built-in light/dark themes, register custom themes with ThemeManager, and apply them globally or per-instance using the token system."
 ---
 
 VChart's theming system is a structured, composable way to control every visual attribute — colors, typography, component styles, and mark appearances — from a single configuration object. Rather than scattering `fill`, `stroke`, and `fontSize` overrides throughout your spec, you register a named theme once and apply it to all chart instances with a single call. The system is layered: built-in themes provide sensible defaults, custom themes extend those defaults by merging only the properties you want to override, and per-chart `spec.theme` settings take the highest precedence.
@@ -135,13 +135,13 @@ When you create a custom theme you can add your own keys to `token` and referenc
 // packages/vchart/src/theme/theme-manager.ts (key methods)
 class ThemeManager {
   static registerTheme(name: string, theme: Partial<ITheme>): void;
-  static getTheme(name: string): ITheme | undefined;
+  static getTheme(name: string, transformed?: boolean): ITheme | undefined;
   static removeTheme(name: string): boolean;
   static themeExist(name: any): boolean;
 
   // Apply a theme to every live chart instance simultaneously
   static setCurrentTheme(name: string): void;
-  static getCurrentTheme(): ITheme;
+  static getCurrentTheme(transformed?: boolean): ITheme;
   static getCurrentThemeName(): string;
   static getDefaultTheme(): ITheme;
 }

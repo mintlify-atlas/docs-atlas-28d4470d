@@ -1,5 +1,5 @@
 ---
-title: "VChart Render, Update, and Data Methods"
+title: "VChart Instance: Render, Update, and Data Methods API"
 sidebarTitle: "Render & Update"
 description: "Full reference for VChart instance methods covering rendering, data updates, spec mutations, viewport control, coordinate conversion, and DOM access."
 ---
@@ -72,8 +72,8 @@ Failing to call `release()` before removing a chart's container from the DOM wil
   The `id` (or `name`) of the data source to update, as declared in `spec.data`.
 </ParamField>
 
-<ParamField path="data" type="DataView | Datum[] | string" required>
-  New data — an array of datum objects, a serialised JSON string, or a `DataView` instance.
+<ParamField path="data" type="Datum[] | string" required>
+  New data — an array of datum objects or a serialised JSON string.
 </ParamField>
 
 <ParamField path="options" type="IParserOptions">
@@ -97,7 +97,7 @@ await chart.updateData('sales', [
   Data source `id` or `name`.
 </ParamField>
 
-<ParamField path="data" type="DataView | Datum[] | string" required>
+<ParamField path="data" type="Datum[] | string" required>
   New data values.
 </ParamField>
 
@@ -274,7 +274,7 @@ window.addEventListener('resize', () => {
 });
 ```
 
-### `updateViewBox(viewBox, reRender?, reLayout?)`
+### `updateViewBox(viewBox, reRender?)`
 
 Restricts the chart drawing area to a sub-rectangle of the canvas without changing the canvas dimensions. Useful for inset charts or when multiple charts share one canvas.
 
@@ -284,10 +284,6 @@ Restricts the chart drawing area to a sub-rectangle of the canvas without changi
 
 <ParamField path="reRender" type="boolean" default="true">
   Whether to trigger a render after applying the view box.
-</ParamField>
-
-<ParamField path="reLayout" type="boolean" default="true">
-  Whether to re-run the layout calculation after changing the view box.
 </ParamField>
 
 **Returns:** `IVChart`

@@ -122,8 +122,6 @@ import {
   type IGroup,
   type IText,
   type IRect,
-  type IArc,   // see IArea / IArc from vrender-core
-  type ISymbol,
   type ILine,
   type IArea,
   type IStage,
@@ -152,8 +150,8 @@ import {
   <Card title="IGroup" icon="object-group">
     Container graphic. Implements `addMark`, `removeMark`, and spatial transform methods.
   </Card>
-  <Card title="IText / IRect / IArc / ISymbol" icon="shapes">
-    Typed interfaces for specific primitives — use these for type-safe `style` callbacks.
+  <Card title="IText / IRect / ILine / IArea" icon="shapes">
+    Typed interfaces for specific primitives — use these for type-safe `style` callbacks. Use `ISymbolGraphicAttribute` for symbol mark styling.
   </Card>
 </CardGroup>
 

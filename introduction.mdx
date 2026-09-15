@@ -1,14 +1,14 @@
 ---
 title: "VChart: Expressive Cross-Platform Charting Library"
 sidebarTitle: "Introduction"
-description: "VChart is a declarative, cross-platform charting library from the VisActor ecosystem with 25+ chart types, animations, theming, and tree-shakable architecture."
+description: "VChart is a declarative, cross-platform charting library with 25+ chart types, smooth animations, theming, and a tree-shakable architecture."
 ---
 
-VChart is a charting library built on top of [VGrammar](https://www.visactor.io/vgrammar) (a visual grammar engine) and [VRender](https://www.visactor.io/vrender) (a high-performance rendering engine). Both are core parts of the [VisActor](https://www.visactor.io/) visualization ecosystem. Rather than wrapping a third-party renderer, VChart owns its entire rendering stack — giving it fine-grained control over performance, animation, and cross-platform compatibility. You describe what you want using a plain JSON **spec** object, and VChart handles layout, scaling, theming, interaction, and animation automatically. Whether you're targeting a desktop browser, a mobile WebView, Node.js for server-side rendering, or a WeChat/Feishu/Taro mini-program, the same spec works without modification.
+VChart is a charting library built on [VRender](https://www.visactor.io/vrender) (a high-performance rendering engine) and a suite of VisActor primitives including [VDataset](https://github.com/VisActor/VDataset), VScale, and VLayouts. All are core parts of the [VisActor](https://www.visactor.io/) visualization ecosystem. Rather than wrapping a third-party renderer, VChart owns its entire rendering stack — giving it fine-grained control over performance, animation, and cross-platform compatibility. You describe what you want using a plain JSON **spec** object, and VChart handles layout, scaling, theming, interaction, and animation automatically. Whether you're targeting a desktop browser, a mobile WebView, Node.js for server-side rendering, or a WeChat/Feishu/Taro mini-program, the same spec works without modification.
 
 ## Where VChart Fits
 
-VChart sits at the top of the VisActor stack. VRender handles GPU-accelerated canvas drawing; VGrammar provides a declarative grammar of graphics; VChart adds chart-level abstractions — axes, legends, tooltips, data transforms, series types, and the full set of chart-specific components — on top of that grammar layer. You interact exclusively with VChart's public API and never need to touch the lower layers directly.
+VChart sits at the top of the VisActor stack. VRender handles GPU-accelerated canvas drawing; VDataset manages data pipelines and transforms; VScale and VLayouts handle scale mappings and layout algorithms; VChart adds chart-level abstractions — axes, legends, tooltips, series types, and the full set of chart-specific components — on top of those primitives. You interact exclusively with VChart's public API and never need to touch the lower layers directly.
 
 <CardGroup cols={2}>
   <Card title="Quickstart" icon="bolt" href="/quickstart">
@@ -104,7 +104,6 @@ VChart is one of several libraries published under the VisActor organisation. Yo
 |---|---|
 | `@visactor/vrender` | GPU-accelerated canvas renderer |
 | `@visactor/vrender-components` | Low-level chart component primitives |
-| `@visactor/vgrammar` | Grammar-of-graphics engine |
 | `@visactor/vdataset` | Data pipeline (transforms, parsing) |
 | `@visactor/vscale` | Scale utilities (band, linear, log, etc.) |
 | `@visactor/vlayouts` | Layout algorithms |

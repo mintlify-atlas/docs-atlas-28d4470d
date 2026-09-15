@@ -39,7 +39,7 @@ Every VChart chart is driven by a plain JavaScript object called the **spec**. R
   "tooltip": { "visible": true, "trigger": "hover" },
   "crosshair": { "xField": { "visible": true } },
   "theme": "light",
-  "animation": true
+  "animationThreshold": 2000
 }
 ```
 
@@ -154,9 +154,10 @@ Every VChart chart is driven by a plain JavaScript object called the **spec**. R
   layouts.
 </ParamField>
 
-<ParamField path="seriesField" type="string">
-  The data field used to differentiate multiple series within a single chart.
-  When set, each unique value in this field becomes a separate colored series.
+<ParamField path="seriesStyle" type="ISeriesStyle">
+  Per-group style overrides, indexed by the values of the `seriesField` on each
+  series. Only takes effect when `seriesField` is configured on the series.
+  Each entry specifies a `name` (the group value) and per-mark style objects.
 </ParamField>
 
 ### Components
@@ -241,36 +242,33 @@ Every VChart chart is driven by a plain JavaScript object called the **spec**. R
 
 ### Animation
 
-<ParamField path="animation" type="boolean" default="true">
-  Master switch for chart animations. When `false`, all enter, exit, and update
-  animations are disabled globally. Individual series can still override this
-  with their own `animation` field.
-</ParamField>
-
 <ParamField path="animationThreshold" type="number">
   The maximum number of data points in a single series before animations are
-  automatically disabled for performance. Defaults to a library-managed value.
-  Set to `Infinity` to never auto-disable.
+  automatically disabled for performance. When a series exceeds this count,
+  VChart skips enter/update animations for that series. Defaults to a
+  library-managed value.
 </ParamField>
+
+<Note>
+  The `animation: boolean` toggle is part of the **series spec** (`ISeriesSpec`),
+  not `IChartSpec` directly. For single-series chart types (bar, line, area, etc.),
+  VChart merges series spec fields into the top-level chart spec, so you can write
+  `animation: false` at the top level for those charts. For combination charts, set
+  `animation` on each individual series in the `series` array.
+</Note>
 
 ### Interaction
 
 <ParamField path="hover" type="boolean | IHoverSpec" default="true">
   Controls hover highlighting. Set `false` to disable hover effects globally, or
-  provide an `IHoverSpec` object to configure which element triggers highlight
-  and the `trigger` type (`"item"` or `"dimension"`).
+  provide an `IHoverSpec` object with `enable`, `trigger`, `triggerOff`,
+  `markIds`, and `markNames` to configure which marks are affected.
 </ParamField>
 
 <ParamField path="select" type="boolean | ISelectSpec" default="true">
   Controls click-selection behavior. Accepts `false` to disable or an
-  `ISelectSpec` to configure `mode` (`"single"` or `"multiple"`), trigger, and
-  other options.
-</ParamField>
-
-<ParamField path="interactions" type="IInteractionSpec[]">
-  An array of explicit interaction specs for richer interaction composition.
-  Each spec references an interaction type registered with VChart's interaction
-  system.
+  `ISelectSpec` to configure `mode` (`"single"` or `"multiple"`), `trigger`,
+  `triggerOff`, `markIds`, and `markNames`.
 </ParamField>
 
 ### Theming

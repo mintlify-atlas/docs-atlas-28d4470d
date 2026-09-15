@@ -1,7 +1,7 @@
 ---
-title: "Handling Events in VChart Charts"
+title: "Handling User and Lifecycle Events in VChart Charts"
 sidebarTitle: "Events"
-description: "Subscribe to pointer, mouse, touch, gesture, and chart lifecycle events in VChart using vchart.on(), EventQuery filters, and ChartEvent enum values."
+description: "Subscribe to pointer, mouse, touch, and chart lifecycle events in VChart using vchart.on(), EventQuery filters, and ChartEvent enum values."
 ---
 
 VChart exposes a unified event API that covers three categories: **primitive input events** (pointer, mouse, touch, gesture, drag), **chart-level semantic events** (legend, brush, dataZoom, tooltip, layout), and **lifecycle hook events** emitted at specific points in the render pipeline. Every event can be scoped to a specific bubble level (mark → model → chart → vchart) and filtered by mark type, series, component ID, or a custom predicate — giving you surgical control over which interactions your handlers respond to.
@@ -50,6 +50,7 @@ These match standard DOM / VRender event names and are available on any chart:
     | `mouseupoutside` | Mouse released outside canvas |
     | `rightdown` | Right mouse button pressed |
     | `rightup` | Right mouse button released |
+    | `rightupoutside` | Right mouse released outside canvas |
     | `click` | Left click |
     | `dblclick` | Double click |
     | `mousemove` | Mouse moved |
@@ -260,19 +261,22 @@ Every primitive event callback receives a `BaseEventParams` object:
 
 ```ts
 interface BaseEventParams {
-  event: Event;        // The original DOM / VRender event
-  item: IMarkGraphic;  // The hit-tested VRender graphic element
-  datum: Datum;        // The data row bound to the element
-  source: EventSourceType; // 'chart' | 'window'
-  mark?: IMark;        // The VChart mark that owns the graphic
-  model?: IModel;      // The series/component model
-  chart?: IChart;      // The internal chart instance
+  event: Event;             // The original DOM / VRender event
+  item: IMarkGraphic;       // The hit-tested VRender graphic element
+  datum: Datum;             // The data row bound to the element
+  source: EventSourceType;  // 'chart' | 'window'
+  node?: IGraphic;          // The raw VRender graphic node
+  mark?: IMark;             // The VChart mark that owns the graphic
+  model?: IModel;           // The series/component model
+  chart?: IChart;           // The internal chart instance
+  vchart?: IVChart;         // Present in lifecycle events
+  value?: any;              // Present in component events (dataZoomChange, etc.)
 }
 ```
 
 ### `ExtendEventParam`
 
-Lifecycle and semantic events use `ExtendEventParam`, which adds an optional `vchart` property for lifecycle events:
+Lifecycle and semantic events use `ExtendEventParam`, which extends `EventParams` and is the base type for non-primitive events. Key fields include:
 
 ```ts
 interface ExtendEventParam {

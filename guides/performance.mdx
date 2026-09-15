@@ -1,7 +1,7 @@
 ---
-title: "Optimizing VChart Performance and Bundle Size"
+title: "Optimizing VChart Bundle Size and Runtime Performance"
 sidebarTitle: "Performance"
-description: "Reduce bundle size and improve runtime performance in VChart with selective register imports, animation: false, renderSync, and tree-shakeable entry points."
+description: "Reduce bundle size and improve runtime performance in VChart with selective register imports, animation: false, renderSync, and tree-shakeable entries."
 ---
 
 Out of the box, importing `@visactor/vchart` gives you every chart type, component, interaction, and plugin pre-registered — convenient for prototyping, but larger than necessary for production apps that use only a few chart types. VChart's `useRegisters()` API lets you opt in to exactly what you need, producing bundles that can be significantly smaller than the full build. Beyond bundle size, runtime performance is governed by animation toggles, synchronous vs. asynchronous rendering, and how you handle resize and update cycles.

@@ -1,5 +1,5 @@
 ---
-title: "Series and Marks: VChart Visual Primitives"
+title: "VChart Series and Marks: Visual Encoding Primitives"
 sidebarTitle: "Series & Marks"
 description: "Explore VChart's series types (bar, line, pie, scatter, and more) and the low-level mark primitives that compose every chart visualization."
 ---
@@ -113,6 +113,18 @@ VChart ships with the following built-in series types. In a `common` chart you r
   <Card title="correlation" icon="diagram-successor">
     Node-link layout for correlation or network data.
   </Card>
+  <Card title="gaugePointer" icon="gauge-high">
+    Pointer needle used inside `gauge` charts to indicate the current value.
+  </Card>
+  <Card title="venn" icon="circle-half-stroke">
+    Venn diagram showing set overlaps via proportionally sized intersecting circles.
+  </Card>
+  <Card title="mosaic" icon="border-all">
+    Mosaic / Marimekko chart — both x-axis width and y-axis height encode data values.
+  </Card>
+  <Card title="pictogram" icon="image">
+    Pictogram / unit chart — icon-based visual encoding for counts or proportions.
+  </Card>
 </CardGroup>
 
 ## Mark Primitives (`MarkTypeEnum`)
@@ -122,23 +134,26 @@ Below the series layer, every visual element is one of a fixed set of mark types
 ```typescript
 // packages/vchart/src/mark/interface/type.ts
 export const enum MarkTypeEnum {
-  group    = 'group',    // logical container — no visual output
-  symbol   = 'symbol',  // configurable shapes: circle, square, triangle…
-  rule     = 'rule',    // single straight line segment
-  line     = 'line',    // polyline connecting data points
-  text     = 'text',    // label, axis tick, or annotation text
-  rect     = 'rect',    // rectangle — the bar in a bar chart
-  image    = 'image',   // bitmap image at a position
-  path     = 'path',    // arbitrary SVG path / custom shape
-  area     = 'area',    // filled polygon under a line
-  arc      = 'arc',     // circular sector — the slice in a pie chart
-  polygon  = 'polygon', // arbitrary closed polygon
-  boxPlot  = 'boxPlot', // compound glyph for box-and-whisker
-  linkPath = 'linkPath',// curved link used in Sankey & network charts
-  cell     = 'cell',    // rectangular cell used in heatmap
-  ripple   = 'ripple',  // pulsing animation circle
-  liquid   = 'liquid',  // liquid-fill shape
-  label    = 'label',   // high-level label mark (proxies text)
+  group     = 'group',     // logical container — no visual output
+  symbol    = 'symbol',    // configurable shapes: circle, square, triangle…
+  rule      = 'rule',      // single straight line segment
+  line      = 'line',      // polyline connecting data points
+  text      = 'text',      // label, axis tick, or annotation text
+  rect      = 'rect',      // rectangle — the bar in a bar chart
+  image     = 'image',     // bitmap image at a position
+  path      = 'path',      // arbitrary SVG path / custom shape
+  area      = 'area',      // filled polygon under a line
+  arc       = 'arc',       // circular sector — the slice in a pie chart
+  polygon   = 'polygon',   // arbitrary closed polygon
+  boxPlot   = 'boxPlot',   // compound glyph for box-and-whisker
+  linkPath  = 'linkPath',  // curved link used in Sankey & network charts
+  cell      = 'cell',      // rectangular cell used in heatmap
+  ripple    = 'ripple',    // pulsing animation circle
+  liquid    = 'liquid',    // liquid-fill shape
+  component = 'component', // internal composite mark wrapping a component
+  dataLabel = 'dataLabel', // high-level data-label group mark
+  label     = 'label',     // individual label mark (proxies text)
+  pictogram = 'pictogram', // icon / pictogram shape mark
 }
 ```
 
