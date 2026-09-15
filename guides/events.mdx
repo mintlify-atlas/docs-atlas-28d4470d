@@ -1,0 +1,345 @@
+---
+title: "Handling Events in VChart Charts"
+sidebarTitle: "Events"
+description: "Subscribe to pointer, mouse, touch, gesture, and chart lifecycle events in VChart using vchart.on(), EventQuery filters, and ChartEvent enum values."
+---
+
+VChart exposes a unified event API that covers three categories: **primitive input events** (pointer, mouse, touch, gesture, drag), **chart-level semantic events** (legend, brush, dataZoom, tooltip, layout), and **lifecycle hook events** emitted at specific points in the render pipeline. Every event can be scoped to a specific bubble level (mark → model → chart → vchart) and filtered by mark type, series, component ID, or a custom predicate — giving you surgical control over which interactions your handlers respond to.
+
+## The `on` and `off` API
+
+```ts
+// Attach a listener
+vchart.on(eventType, callback);
+
+// Attach with an EventQuery filter
+vchart.on(eventType, query, callback);
+
+// Remove a specific callback
+vchart.off(eventType, callback);
+
+// Remove a filtered callback
+vchart.off(eventType, query, callback);
+```
+
+Both methods return the `IVChart` instance for chaining. The `callback` receives a typed `EventParams` object whose shape depends on the event type.
+
+## Primitive Event Types
+
+These match standard DOM / VRender event names and are available on any chart:
+
+<Tabs>
+  <Tab title="Pointer">
+    | Event | Description |
+    |---|---|
+    | `pointerdown` | Pointer pressed |
+    | `pointerup` | Pointer released |
+    | `pointerupoutside` | Pointer released outside the canvas |
+    | `pointertap` | Click equivalent for pointer events |
+    | `pointerover` | Pointer enters an element |
+    | `pointermove` | Pointer moves over an element |
+    | `pointerenter` | Pointer enters (no bubble) |
+    | `pointerleave` | Pointer leaves (no bubble) |
+    | `pointerout` | Pointer leaves an element |
+  </Tab>
+  <Tab title="Mouse">
+    | Event | Description |
+    |---|---|
+    | `mousedown` | Mouse button pressed |
+    | `mouseup` | Mouse button released |
+    | `mouseupoutside` | Mouse released outside canvas |
+    | `rightdown` | Right mouse button pressed |
+    | `rightup` | Right mouse button released |
+    | `click` | Left click |
+    | `dblclick` | Double click |
+    | `mousemove` | Mouse moved |
+    | `mouseover` | Mouse enters element |
+    | `mouseout` | Mouse leaves element |
+    | `mouseenter` | Mouse enters (no bubble) |
+    | `mouseleave` | Mouse leaves (no bubble) |
+    | `wheel` | Mouse wheel scrolled |
+  </Tab>
+  <Tab title="Touch & Gesture">
+    | Event | Description |
+    |---|---|
+    | `touchstart` | Touch began |
+    | `touchend` | Touch ended |
+    | `touchendoutside` | Touch ended outside canvas |
+    | `touchmove` | Touch moved |
+    | `touchcancel` | Touch cancelled |
+    | `tap` | Tap gesture |
+    | `pan` / `panstart` / `panend` | Pan gesture |
+    | `press` / `pressup` / `pressend` | Long press gesture |
+    | `pinch` / `pinchstart` / `pinchend` | Pinch gesture |
+    | `swipe` | Swipe gesture |
+  </Tab>
+  <Tab title="Drag">
+    | Event | Description |
+    |---|---|
+    | `dragstart` | Drag started |
+    | `drag` | Dragging |
+    | `dragenter` | Dragged over target |
+    | `dragleave` | Dragged off target |
+    | `dragover` | Hovering over drop target |
+    | `dragend` | Drag completed |
+    | `drop` | Dropped on target |
+  </Tab>
+</Tabs>
+
+## ChartEvent Values
+
+`ChartEvent` is an enum that defines VChart's semantic events. Subscribe using the enum value or its string equivalent:
+
+<CodeGroup>
+```ts Lifecycle Events
+import { ChartEvent } from '@visactor/vchart';
+
+vchart.on(ChartEvent.initialized, ({ vchart }) => {
+  console.log('Chart initialized:', vchart);
+});
+
+vchart.on(ChartEvent.rendered, ({ vchart }) => {
+  // Fired once when render() is first called
+});
+
+vchart.on(ChartEvent.renderFinished, () => {
+  // Fired after every canvas draw (excluding animation frames)
+});
+
+vchart.on(ChartEvent.animationFinished, () => {
+  // Fired when all animations complete
+});
+
+vchart.on(ChartEvent.layoutStart, () => {
+  console.log('Layout calculation started');
+});
+
+vchart.on(ChartEvent.layoutEnd, ({ elements }) => {
+  console.log('Layout finished, elements:', elements);
+});
+```
+
+```ts Component Events
+// Legend
+vchart.on(ChartEvent.legendItemHover, e => {
+  console.log('Legend item hovered:', e.event?.detail?.data);
+});
+
+vchart.on(ChartEvent.legendItemClick, e => {
+  console.log('Legend item clicked');
+});
+
+vchart.on(ChartEvent.legendSelectedDataChange, e => {
+  console.log('Legend filter changed');
+});
+
+// DataZoom
+vchart.on(ChartEvent.dataZoomChange, e => {
+  console.log('DataZoom changed:', e.value);
+});
+
+// ScrollBar
+vchart.on(ChartEvent.scrollBarChange, e => {
+  console.log('ScrollBar changed:', e.value);
+});
+```
+
+```ts Brush Events
+vchart.on(ChartEvent.brushStart, e => {
+  console.log('Brush started');
+});
+
+vchart.on(ChartEvent.brushChange, e => {
+  console.log('Brush updated');
+});
+
+vchart.on(ChartEvent.brushEnd, e => {
+  console.log('Brush ended, selected region:', e.value);
+});
+
+vchart.on(ChartEvent.brushClear, () => {
+  console.log('Brush selection cleared');
+});
+```
+</CodeGroup>
+
+The full list of `ChartEvent` values includes:
+
+| Key | String Value | Description |
+|---|---|---|
+| `initialized` | `'initialized'` | Chart instance fully initialized |
+| `rendered` | `'rendered'` | `render()` called for the first time |
+| `renderFinished` | `'renderFinished'` | Canvas repaint complete |
+| `animationFinished` | `'animationFinished'` | All animations done |
+| `layoutStart` | `'layoutStart'` | Layout pass beginning |
+| `layoutEnd` | `'layoutEnd'` | Layout pass complete |
+| `afterResize` | `'afterResize'` | Chart resized |
+| `legendItemClick` | `'legendItemClick'` | Legend item clicked |
+| `legendItemHover` | `'legendItemHover'` | Legend item hovered |
+| `legendItemUnHover` | `'legendItemUnHover'` | Legend hover cleared |
+| `legendSelectedDataChange` | `'legendSelectedDataChange'` | Legend filter changed |
+| `dataZoomChange` | `'dataZoomChange'` | DataZoom range changed |
+| `scrollBarChange` | `'scrollBarChange'` | ScrollBar position changed |
+| `brushStart` / `brushChange` / `brushEnd` / `brushClear` | — | Brush lifecycle |
+| `tooltipShow` / `tooltipHide` / `tooltipRelease` | — | Tooltip visibility |
+| `drill` | `'drill'` | Hierarchy drill-down/up |
+| `scaleDomainUpdate` | `'scaleDomainUpdate'` | Scale domain recalculated |
+
+## EventQuery: Scoping and Filtering
+
+Pass an `EventQuery` object as the second argument to narrow which events trigger the callback:
+
+```ts
+import { Event_Bubble_Level } from '@visactor/vchart';
+
+// Only handle click events that originate from bar marks
+vchart.on('click', { level: 'mark', type: 'bar' }, params => {
+  console.log('Bar clicked, datum:', params.datum);
+});
+
+// Only handle events from a series with a specific spec id
+vchart.on('click', { id: 'mySeries' }, params => {
+  console.log('Series clicked:', params.datum);
+});
+
+// Filter by mark name
+vchart.on('pointerover', { markName: 'point' }, params => {
+  console.log('Point hovered:', params.datum);
+});
+
+// Custom predicate filter
+vchart.on('click', {
+  filter: params => params.datum?.value > 100
+}, params => {
+  console.log('Clicked a high-value element:', params.datum);
+});
+
+// Throttle handler (fires at most once per 200 ms)
+vchart.on('pointermove', { throttle: 200 }, params => {
+  updateCustomTooltip(params.datum);
+});
+```
+
+### `EventQuery` Fields
+
+<AccordionGroup>
+  <Accordion title="level: EventBubbleLevel">
+    Limits events to a specific bubble tier: `'vchart'` (top level), `'chart'`, `'model'` (series/component), or `'mark'` (individual graphic). The event bubble order is: `mark → model → chart → vchart`.
+  </Accordion>
+  <Accordion title="source: EventSourceType">
+    Filter by event origin: `'chart'` (canvas events), `'window'` (global window events).
+  </Accordion>
+  <Accordion title="type: EventTargetType">
+    Filter by mark type (e.g. `'bar'`, `'point'`, `'line'`) or component type (e.g. `'axis'`, `'legend'`, `'tooltip'`). Only meaningful when `level` is `'mark'` or `'model'`.
+  </Accordion>
+  <Accordion title="id: StringOrNumber">
+    Matches the `id` field you set in the spec (e.g. `{ type: 'line', id: 'trend-line', ... }`).
+  </Accordion>
+  <Accordion title="markName: string">
+    Filter by the VRender mark's name property. Useful for targeting sub-marks within a series.
+  </Accordion>
+  <Accordion title="nodeName: string">
+    Filter by the raw VRender graphic node name.
+  </Accordion>
+  <Accordion title="filter: (params) => boolean">
+    A custom predicate. Receives a partial `BaseEventParams` and should return `true` to allow the event.
+  </Accordion>
+  <Accordion title="throttle / debounce: number">
+    Milliseconds for throttle or debounce wrapping of the callback. Mutually exclusive.
+  </Accordion>
+  <Accordion title="consume: boolean">
+    When `true`, stops the event from bubbling further up the hierarchy.
+  </Accordion>
+</AccordionGroup>
+
+## Event Parameter Structure
+
+### `BaseEventParams`
+
+Every primitive event callback receives a `BaseEventParams` object:
+
+```ts
+interface BaseEventParams {
+  event: Event;        // The original DOM / VRender event
+  item: IMarkGraphic;  // The hit-tested VRender graphic element
+  datum: Datum;        // The data row bound to the element
+  source: EventSourceType; // 'chart' | 'window'
+  mark?: IMark;        // The VChart mark that owns the graphic
+  model?: IModel;      // The series/component model
+  chart?: IChart;      // The internal chart instance
+}
+```
+
+### `ExtendEventParam`
+
+Lifecycle and semantic events use `ExtendEventParam`, which adds an optional `vchart` property for lifecycle events:
+
+```ts
+interface ExtendEventParam {
+  event?: Event;
+  item?: IMarkGraphic;
+  datum?: Datum;
+  source?: EventSourceType;
+  vchart?: IVChart;  // present in lifecycle events (initialized, rendered, etc.)
+  value?: any;       // present in component events (dataZoomChange, etc.)
+}
+```
+
+## Practical Examples
+
+<Steps>
+  <Step title="Click a bar to inspect its data">
+```ts
+vchart.on('click', { level: 'mark', type: 'bar' }, params => {
+  if (params.datum) {
+    document.getElementById('info').textContent =
+      `${params.datum.category}: ${params.datum.value}`;
+  }
+});
+```
+  </Step>
+  <Step title="Custom hover tooltip logic">
+```ts
+const tooltip = document.getElementById('custom-tooltip');
+
+vchart.on('pointerover', { level: 'mark' }, params => {
+  if (!params.datum) return;
+  tooltip.style.display = 'block';
+  tooltip.style.left = params.event.clientX + 'px';
+  tooltip.style.top  = params.event.clientY + 'px';
+  tooltip.textContent = JSON.stringify(params.datum);
+});
+
+vchart.on('pointerout', { level: 'mark' }, () => {
+  tooltip.style.display = 'none';
+});
+```
+  </Step>
+  <Step title="React to layout completion">
+```ts
+vchart.on('layoutEnd', params => {
+  const { elements } = params;
+  const plotArea = elements.find(el => el.type === 'region');
+  if (plotArea) {
+    console.log('Plot area bounds:', plotArea.getLayoutRect());
+  }
+});
+```
+  </Step>
+  <Step title="Remove a listener">
+```ts
+const handler = params => {
+  console.log('Clicked:', params.datum);
+};
+
+vchart.on('click', handler);
+
+// Later, remove it:
+vchart.off('click', handler);
+```
+  </Step>
+</Steps>
+
+<Tip>
+  Events bubble from `mark` → `model` → `chart` → `vchart`. If you add a listener at the `vchart` level (the default when no `level` is specified in `EventQuery`), it receives events that have bubbled all the way up. Use `consume: true` in your `EventQuery` to stop propagation and prevent downstream handlers from firing.
+</Tip>

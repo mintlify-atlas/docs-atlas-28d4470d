@@ -1,0 +1,271 @@
+---
+title: "Series and Marks: VChart Visual Primitives"
+sidebarTitle: "Series & Marks"
+description: "Explore VChart's series types (bar, line, pie, scatter, and more) and the low-level mark primitives that compose every chart visualization."
+---
+
+Every VChart chart is built from two layers of abstraction: **series** and **marks**. A *series* is the highest-level visual unit — it binds a slice of data to a particular chart idiom (bars, lines, pie slices, etc.) and decides how rows map to positions, sizes, and colors. A *mark* is the lowest-level rendering primitive — the actual SVG or canvas shape (a rectangle, a path, a text glyph) that the series places on the canvas. Understanding both layers unlocks full control over appearance and behavior.
+
+## What Is a Series?
+
+A series is VChart's core visual encoding unit. It reads data rows, maps field values through scales, and emits a set of marks that represent those rows. Every chart type corresponds to one or more default series types. In a `bar` chart the implicit series type is `bar`; in a `common` composite chart you can mix any combination of series types by listing them in `spec.series`.
+
+Every series spec (`ISeriesSpec`) shares a common base:
+
+```typescript
+// packages/vchart/src/typings/spec/common.ts (excerpt)
+export interface ISeriesSpec {
+  type: SeriesType;           // e.g. 'bar' | 'line' | 'pie'
+  name?: string;              // display name used in legends & tooltips
+  id?: StringOrNumber;        // stable id for programmatic access
+  data?: IDataType;           // series-local dataset
+  dataIndex?: number;         // bind to top-level data[N]
+  dataId?: StringOrNumber;    // bind to top-level data by id
+  seriesField?: string;       // field that defines color groups
+  stack?: boolean;            // enable value stacking
+  percent?: boolean;          // normalize stacked values to 100 %
+  tooltip?: ISeriesTooltipSpec;
+  animation?: boolean;
+  extensionMark?: IExtensionMarkSpec[];  // attach extra custom marks
+}
+```
+
+## All Series Types
+
+VChart ships with the following built-in series types. In a `common` chart you reference them by the `type` string; for dedicated single-series charts the type is implied.
+
+<CardGroup cols={3}>
+  <Card title="bar" icon="chart-bar">
+    Vertical or horizontal bars. Supports stacking, grouping, and percentage mode.
+  </Card>
+  <Card title="line" icon="chart-line">
+    Connected line segments. Supports smooth curves, dash patterns, and symbol points.
+  </Card>
+  <Card title="area" icon="chart-area">
+    Filled area under a line. Supports stacking and band fills between two lines.
+  </Card>
+  <Card title="scatter" icon="circle-dot">
+    Individual symbols plotted at (x, y) coordinates. Size and color can encode extra dimensions.
+  </Card>
+  <Card title="pie" icon="circle-half-stroke">
+    Angular slices of a disk. Also powers donut charts via inner-radius config.
+  </Card>
+  <Card title="radar" icon="star">
+    Polygon or line overlaid on a radial axis grid.
+  </Card>
+  <Card title="rose" icon="sun">
+    Polar bar chart — bar length mapped to radius on a circular axis.
+  </Card>
+  <Card title="funnel" icon="filter">
+    Trapezoid stages for conversion / pipeline visualization.
+  </Card>
+  <Card title="waterfall" icon="water">
+    Cumulative bars with positive / negative step deltas.
+  </Card>
+  <Card title="rangeColumn" icon="grip-lines">
+    Bars spanning a [min, max] value range on the value axis.
+  </Card>
+  <Card title="rangeArea" icon="wave-square">
+    Filled band between upper and lower boundary lines.
+  </Card>
+  <Card title="heatmap" icon="table-cells">
+    Grid cells color-encoded by a third numeric value.
+  </Card>
+  <Card title="map" icon="map">
+    Choropleth map with geo coordinate support.
+  </Card>
+  <Card title="sankey" icon="diagram-project">
+    Flow diagram with proportional links between nodes.
+  </Card>
+  <Card title="treemap" icon="border-all">
+    Nested rectangles for hierarchical part-to-whole data.
+  </Card>
+  <Card title="sunburst" icon="circle-notch">
+    Radial hierarchy with concentric ring sectors.
+  </Card>
+  <Card title="circlePacking" icon="circle">
+    Packed circles for hierarchical size comparisons.
+  </Card>
+  <Card title="gauge" icon="gauge">
+    Speedometer-style arc with a pointer needle.
+  </Card>
+  <Card title="circularProgress" icon="spinner">
+    Arc segments showing progress toward a goal.
+  </Card>
+  <Card title="linearProgress" icon="sliders">
+    Horizontal bar showing progress toward a goal.
+  </Card>
+  <Card title="wordCloud" icon="cloud">
+    Text laid out with size proportional to a numeric field.
+  </Card>
+  <Card title="boxplot" icon="box">
+    Box-and-whisker plot for statistical distributions.
+  </Card>
+  <Card title="dot" icon="dot-circle">
+    Sequence chart dots, used inside `sequence` charts.
+  </Card>
+  <Card title="link" icon="link">
+    Arc or straight links between nodes in a sequence chart.
+  </Card>
+  <Card title="liquid" icon="droplet">
+    Liquid-fill gauge for single-value percentages.
+  </Card>
+  <Card title="correlation" icon="diagram-successor">
+    Node-link layout for correlation or network data.
+  </Card>
+</CardGroup>
+
+## Mark Primitives (`MarkTypeEnum`)
+
+Below the series layer, every visual element is one of a fixed set of mark types. You can reference these types when writing `customMark` specs or `extensionMark` overrides:
+
+```typescript
+// packages/vchart/src/mark/interface/type.ts
+export const enum MarkTypeEnum {
+  group    = 'group',    // logical container — no visual output
+  symbol   = 'symbol',  // configurable shapes: circle, square, triangle…
+  rule     = 'rule',    // single straight line segment
+  line     = 'line',    // polyline connecting data points
+  text     = 'text',    // label, axis tick, or annotation text
+  rect     = 'rect',    // rectangle — the bar in a bar chart
+  image    = 'image',   // bitmap image at a position
+  path     = 'path',    // arbitrary SVG path / custom shape
+  area     = 'area',    // filled polygon under a line
+  arc      = 'arc',     // circular sector — the slice in a pie chart
+  polygon  = 'polygon', // arbitrary closed polygon
+  boxPlot  = 'boxPlot', // compound glyph for box-and-whisker
+  linkPath = 'linkPath',// curved link used in Sankey & network charts
+  cell     = 'cell',    // rectangular cell used in heatmap
+  ripple   = 'ripple',  // pulsing animation circle
+  liquid   = 'liquid',  // liquid-fill shape
+  label    = 'label',   // high-level label mark (proxies text)
+}
+```
+
+### The Chart → Series → Mark chain
+
+```
+ISpec.type        →  Chart class
+                      └─ creates Series  →  Series class
+                                              └─ emits Marks  →  MarkTypeEnum primitives
+```
+
+For example:
+
+| Chart `type` | Series type | Primary mark |
+|---|---|---|
+| `bar` | `bar` | `rect` |
+| `line` | `line` | `line` + `symbol` (points) |
+| `area` | `area` | `area` + `line` + `symbol` |
+| `pie` | `pie` | `arc` |
+| `scatter` | `scatter` | `symbol` |
+| `heatmap` | `heatmap` | `cell` |
+| `sankey` | `sankey` | `linkPath` + `rect` |
+
+## Customising Mark Styles
+
+Each series spec exposes named mark fields that accept an `IMarkSpec<T>` object. This lets you override default visual properties per mark type and per interaction state:
+
+```typescript
+// IMarkSpec shape (packages/vchart/src/typings/spec/common.ts)
+export type IMarkSpec<T extends ICommonSpec = ICommonSpec> = {
+  id?: StringOrNumber;
+  interactive?: boolean;
+  zIndex?: number;
+  visible?: boolean;
+  style?: ConvertToMarkStyleSpec<T>;     // default appearance
+  state?: IMarkStateFullSpec<T>;         // per-state overrides
+};
+```
+
+### Bar chart — customising the `bar` mark
+
+The `IBarSeriesSpec` exposes a `bar` field (typed as `IMarkSpec<IRectMarkSpec>`) where you can set any rect attribute:
+
+```javascript
+const spec = {
+  type: 'bar',
+  data: {
+    id: 'revenue',
+    values: [
+      { month: 'Jan', sales: 120 },
+      { month: 'Feb', sales: 200 },
+      { month: 'Mar', sales: 150 }
+    ]
+  },
+  xField: 'month',
+  yField: 'sales',
+
+  // ── Override the bar rect mark ────────────────────────────────
+  bar: {
+    style: {
+      // Static styles
+      cornerRadius: [6, 6, 0, 0], // top-left, top-right, bottom-right, bottom-left
+      fill: '#1664FF',
+      fillOpacity: 0.85
+    },
+    state: {
+      hover: {
+        style: {
+          fillOpacity: 1,
+          stroke: '#004ACC',
+          lineWidth: 2
+        }
+      },
+      selected: {
+        style: {
+          fill: '#FF8A00'
+        }
+      },
+      // Dims non-hovered bars
+      hover_reverse: {
+        style: { fillOpacity: 0.4 }
+      }
+    }
+  }
+};
+```
+
+### Using a callback for data-driven styles
+
+Any style property can be a function `(datum, ctx) => value` to produce per-mark values from data:
+
+```javascript
+bar: {
+  style: {
+    // Colour each bar based on its value
+    fill: (datum) => datum.sales >= 180 ? '#3CC780' : '#1664FF'
+  }
+}
+```
+
+## Extension Marks
+
+Series also support `extensionMark` — an array of additional marks that are rendered in the same coordinate space as the series and receive access to its data:
+
+```javascript
+{
+  type: 'bar',
+  xField: 'month',
+  yField: 'sales',
+  extensionMark: [
+    {
+      type: 'text',
+      dataIndex: 0,
+      style: {
+        // Place a value label above each bar
+        text: (datum) => datum.sales,
+        x: (datum, ctx) => ctx.getRegionCenter(datum).x,
+        y: (datum, ctx) => ctx.getRegionCenter(datum).y - 10,
+        fontSize: 12,
+        fill: '#606773',
+        textAlign: 'center'
+      }
+    }
+  ]
+}
+```
+
+<Note>
+`extensionMark` renders marks in addition to the series' own marks. For fully custom chart elements that are independent of any series, use `spec.customMark` at the chart level instead.
+</Note>

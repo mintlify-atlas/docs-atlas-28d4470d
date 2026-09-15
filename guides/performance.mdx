@@ -1,0 +1,275 @@
+---
+title: "Optimizing VChart Performance and Bundle Size"
+sidebarTitle: "Performance"
+description: "Reduce bundle size and improve runtime performance in VChart with selective register imports, animation: false, renderSync, and tree-shakeable entry points."
+---
+
+Out of the box, importing `@visactor/vchart` gives you every chart type, component, interaction, and plugin pre-registered — convenient for prototyping, but larger than necessary for production apps that use only a few chart types. VChart's `useRegisters()` API lets you opt in to exactly what you need, producing bundles that can be significantly smaller than the full build. Beyond bundle size, runtime performance is governed by animation toggles, synchronous vs. asynchronous rendering, and how you handle resize and update cycles.
+
+## Default Import vs. Selective Import
+
+When you write `import { VChart } from '@visactor/vchart'`, you get the fully-registered variant (`vchart-all`) that pre-loads every chart type, axis, legend, tooltip, brush, dataZoom, interaction trigger, and animation module:
+
+```ts
+// ❌ Full bundle — everything is registered at startup
+import { VChart } from '@visactor/vchart';
+
+const chart = new VChart(spec, { dom: 'container' });
+chart.renderSync();
+```
+
+For production, import the bare `VChart` class and call `useRegisters()` with only what you need:
+
+```ts
+// ✅ Selective import — only the registered pieces are bundled
+import { VChart } from '@visactor/vchart/esm/core';
+import {
+  registerBarChart,
+  registerCartesianLinearAxis,
+  registerCartesianBandAxis,
+  registerTooltip,
+  registerAnimate,
+  registerBrowserEnv,
+  registerDomTooltipHandler
+} from '@visactor/vchart';
+
+registerBrowserEnv();
+
+VChart.useRegisters([
+  registerBarChart,
+  registerCartesianLinearAxis,
+  registerCartesianBandAxis,
+  registerTooltip,
+  registerDomTooltipHandler,
+  registerAnimate
+]);
+
+const chart = new VChart(spec, { dom: 'container' });
+chart.renderSync();
+```
+
+<Note>
+  `VChart.useRegisters()` is cumulative and safe to call multiple times. All registrations are stored in a global factory registry, so you only need to call it once before creating any chart instances.
+</Note>
+
+## Minimal Bundle Example: Bar Chart with Tooltip
+
+The following registers only the components needed for a standalone bar chart with DOM-based tooltips and animations. This is a good baseline for single-chart production pages:
+
+```ts
+import { VChart } from '@visactor/vchart/esm/core';
+import {
+  registerBarChart,
+  registerCartesianLinearAxis,
+  registerCartesianBandAxis,
+  registerLabel,
+  registerTooltip,
+  registerDomTooltipHandler,
+  registerAnimate,
+  registerBrowserEnv
+} from '@visactor/vchart';
+
+registerBrowserEnv();
+
+VChart.useRegisters([
+  registerBarChart,           // bar chart type
+  registerCartesianLinearAxis, // Y axis (numeric)
+  registerCartesianBandAxis,   // X axis (categorical)
+  registerLabel,              // data labels
+  registerTooltip,            // tooltip system
+  registerDomTooltipHandler,  // HTML DOM tooltip renderer
+  registerAnimate             // animation pipeline
+]);
+
+const spec = {
+  type: 'bar',
+  data: [{ id: 'sales', values: [
+    { category: 'Q1', value: 1200 },
+    { category: 'Q2', value: 1850 },
+    { category: 'Q3', value: 1550 },
+    { category: 'Q4', value: 2100 }
+  ]}],
+  xField: 'category',
+  yField: 'value',
+  animationAppear: { preset: 'growHeightIn', duration: 600 }
+};
+
+const chart = new VChart(spec, { dom: 'container' });
+chart.renderSync();
+```
+
+## Common Register Functions
+
+<CardGroup cols={2}>
+  <Card title="Chart Types" icon="chart-bar">
+    `registerBarChart`, `registerLineChart`, `registerAreaChart`, `registerPieChart`, `registerScatterChart`, `registerRadarChart`, `registerMapChart`, `registerGaugeChart`, `registerHeatmapChart`, `registerSankeyChart`, `registerTreemapChart`, and more.
+  </Card>
+  <Card title="Axes" icon="arrows-left-right">
+    `registerCartesianLinearAxis`, `registerCartesianBandAxis`, `registerCartesianTimeAxis`, `registerCartesianLogAxis`, `registerPolarLinearAxis`, `registerPolarBandAxis`
+  </Card>
+  <Card title="Components" icon="puzzle-piece">
+    `registerTooltip`, `registerDiscreteLegend`, `registerContinuousLegend`, `registerCartesianCrossHair`, `registerDataZoom`, `registerScrollBar`, `registerBrush`, `registerLabel`, `registerTitle`
+  </Card>
+  <Card title="Tooltip Handlers" icon="comment">
+    `registerDomTooltipHandler` (HTML), `registerCanvasTooltipHandler` (canvas, lower DOM overhead, good for mini-programs)
+  </Card>
+  <Card title="Interactions" icon="hand-pointer">
+    `registerElementHighlight`, `registerElementSelect`, `registerElementHighlightByLegend`, `registerElementHighlightByGroup`, `registerElementHighlightByKey`
+  </Card>
+  <Card title="Plugins" icon="plug">
+    `registerAnimate`, `registerHtmlAttributePlugin`, `registerReactAttributePlugin`, `registerFormatPlugin`
+  </Card>
+</CardGroup>
+
+## Disabling Animations for Performance
+
+Animation is the single biggest runtime CPU cost. For dashboards with high-frequency data updates, server-side rendering, or low-power devices, disable it:
+
+```ts
+// Option 1: Disable globally via IInitOption
+const chart = new VChart(spec, {
+  dom: 'container',
+  animation: false    // no animation pipeline at all
+});
+
+// Option 2: Disable per animation phase in spec
+const spec = {
+  type: 'line',
+  animationAppear: false,
+  animationUpdate: false,
+  animationExit: false,
+  animationDisappear: false,
+  // ...
+};
+
+// Option 3: Don't register registerAnimate at all (smallest bundle)
+VChart.useRegisters([
+  registerBarChart,
+  registerCartesianLinearAxis,
+  registerCartesianBandAxis
+  // no registerAnimate
+]);
+```
+
+<Warning>
+  If you do not call `registerAnimate()`, morph animations and all `animationAppear` / `animationUpdate` specs will be silently ignored. This is intentional for minimal builds.
+</Warning>
+
+## `renderSync` vs `renderAsync`
+
+VChart provides both synchronous and asynchronous rendering paths:
+
+```ts
+// Synchronous — blocks until the first frame is drawn
+// Use for: server-side rendering, tests, immediate screenshot capture
+chart.renderSync();
+
+// Synchronous with morph/reuse config
+chart.renderSync({ reuse: true, morph: true });
+
+// Asynchronous — schedules render via requestAnimationFrame
+// Use for: browser, especially when batching multiple charts
+await chart.renderAsync();
+```
+
+<Tip>
+  Prefer `renderAsync()` in the browser for large charts or pages with multiple chart instances. It yields to the browser's layout engine between frames, keeping the UI responsive. Use `renderSync()` only when you need the canvas ready immediately (e.g. for `canvas.toDataURL()` or server-side PNG export).
+</Tip>
+
+## Efficient Data Updates
+
+When only data changes (spec structure unchanged), use targeted update methods instead of replacing the entire spec:
+
+```ts
+// ✅ Fast: update only data, preserves layout and scale config
+chart.updateDataSync('salesData', newValues);
+
+// ✅ Fast: replace all dataset values at once
+chart.updateFullDataSync(newDataArray);
+
+// ❌ Slower: re-parses and re-compiles entire spec
+chart.updateSpecSync(newSpec);
+```
+
+For incremental data streams, update data in batches rather than on every incoming point:
+
+```ts
+const buffer: any[] = [];
+let flushTimeout: number;
+
+function onDataPoint(point: any) {
+  buffer.push(point);
+  clearTimeout(flushTimeout);
+  flushTimeout = setTimeout(() => {
+    chart.updateDataSync('stream', [...currentData, ...buffer]);
+    buffer.length = 0;
+  }, 100) as unknown as number; // flush every 100 ms
+}
+```
+
+## autoFit and Resize Handling
+
+Setting `autoFit: true` makes the chart observe its container's `ResizeObserver` and automatically reflow on size changes. This is convenient but adds a small polling overhead:
+
+```ts
+const chart = new VChart(spec, {
+  dom: 'container',
+  autoFit: true   // watches container ResizeObserver
+});
+```
+
+For tighter control, disable `autoFit` and call `chart.resize(width, height)` manually:
+
+```ts
+const chart = new VChart(spec, {
+  dom: 'container',
+  autoFit: false
+});
+
+// Manually resize (e.g. in a window resize handler)
+window.addEventListener('resize', () => {
+  const { width, height } = container.getBoundingClientRect();
+  chart.resize(width, height);
+});
+```
+
+## Canvas vs. DOM Tooltip
+
+The canvas tooltip renderer avoids DOM mutations entirely, which matters at high interaction rates:
+
+```ts
+import {
+  VChart,
+  registerCanvasTooltipHandler, // ← canvas-drawn tooltip
+  registerTooltip
+} from '@visactor/vchart';
+
+VChart.useRegisters([
+  // ...chart and axis registers...
+  registerTooltip,
+  registerCanvasTooltipHandler   // instead of registerDomTooltipHandler
+]);
+```
+
+Use `registerDomTooltipHandler` when you need rich HTML inside tooltips (images, links). Use `registerCanvasTooltipHandler` for maximum throughput (dashboards, real-time charts).
+
+## Multi-Chart Pages: Shared VChart Instance
+
+When rendering many small charts, consider using a single shared canvas via the `VChart` stage-sharing API, or at minimum ensure you call `chart.release()` when chart components unmount to free GPU textures and event listeners:
+
+```ts
+// Always clean up on unmount
+function unmountChart(chart: IVChart) {
+  chart.release();
+}
+```
+
+## Bundle Size Summary
+
+| Entry Point / Config | Approximate Impact |
+|---|---|
+| `import { VChart } from '@visactor/vchart'` | Full bundle — all charts, components, interactions |
+| `VChart.useRegisters([registerBarChart, ...])` | Only selected registrations are bundled (tree-shaken) |
+| Without `registerAnimate` | Removes animation pipeline |
+| `registerCanvasTooltipHandler` vs `registerDomTooltipHandler` | Similar size; canvas avoids DOM overhead at runtime |
+| `animation: false` in `IInitOption` | No runtime animation cost even if `registerAnimate` was called |

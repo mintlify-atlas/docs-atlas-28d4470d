@@ -1,0 +1,613 @@
+---
+title: "Marker Spec: Mark Lines, Areas and Points in VChart"
+sidebarTitle: "Marker Spec"
+description: "Reference for VChart's markLine, markArea, and markPoint specs: coordinate targeting, line/area/point styles, labels, symbols, and aggregation types."
+---
+
+VChart's **marker** system overlays reference annotations directly on the chart's data space. There are three marker types — `markLine` (reference lines), `markArea` (highlighted regions), and `markPoint` (callout annotations) — each of which can be anchored to axis values, data aggregations (average, max, min, etc.), specific data coordinates, or arbitrary canvas positions. All three share a common base spec (`IMarkerSpec`) and are configured as top-level arrays alongside `axes` and `legends` in the chart spec.
+
+## Quick Example: Average Line on a Bar Chart
+
+```json
+{
+  "type": "bar",
+  "data": [{
+    "values": [
+      { "month": "Jan", "sales": 120 },
+      { "month": "Feb", "sales": 240 },
+      { "month": "Mar", "sales": 180 },
+      { "month": "Apr", "sales": 300 }
+    ]
+  }],
+  "xField": "month",
+  "yField": "sales",
+  "markLine": [
+    {
+      "y": "average",
+      "line": {
+        "style": { "stroke": "#e83e3e", "lineWidth": 2, "lineDash": [6, 4] }
+      },
+      "label": {
+        "visible": true,
+        "text": "Average",
+        "position": "insideEndTop",
+        "labelBackground": {
+          "visible": true,
+          "padding": { "top": 2, "right": 6, "bottom": 2, "left": 6 },
+          "style": { "fill": "#e83e3e", "cornerRadius": 4 }
+        },
+        "style": { "fill": "#fff", "fontSize": 12 }
+      },
+      "endSymbol": {
+        "visible": true,
+        "symbolType": "triangleRight",
+        "size": 10,
+        "style": { "fill": "#e83e3e" }
+      }
+    }
+  ],
+  "markArea": [
+    {
+      "y": 200,
+      "y1": 300,
+      "area": { "style": { "fill": "rgba(22, 100, 255, 0.08)" } },
+      "label": {
+        "visible": true,
+        "text": "Target Range",
+        "position": "insideTop"
+      }
+    }
+  ]
+}
+```
+
+## Common Marker Base (`IMarkerSpec`)
+
+These fields are available on `markLine`, `markArea`, and `markPoint`.
+
+<ParamField path="visible" type="boolean" default="true">
+  Whether to render this marker. Setting `false` hides the marker without
+  removing it from the spec.
+</ParamField>
+
+<ParamField path="interactive" type="boolean" default="true">
+  Whether the marker responds to pointer events (hover highlight, click).
+</ParamField>
+
+<ParamField path="relativeSeriesIndex" type="number">
+  The index of the series this marker's data is computed from. Defaults to the
+  first series in the chart.
+</ParamField>
+
+<ParamField path="relativeSeriesId" type="string | number">
+  The `id` of the series this marker's data is computed from. Takes precedence
+  over `relativeSeriesIndex` when both are set.
+</ParamField>
+
+<ParamField path="autoRange" type="boolean" default="false">
+  When `true`, the axis range automatically expands to include the marker's
+  target position, even if it falls outside the data range. Since v1.1.0.
+</ParamField>
+
+<ParamField path="clip" type="boolean" default="false">
+  When `true`, the marker is clipped to the chart region boundary and won't
+  overflow onto axes or titles. Since v1.3.0.
+</ParamField>
+
+<ParamField path="name" type="string">
+  A named identifier for this marker. Useful for targeting the marker in event
+  handlers via `markName` filters. Since v1.7.0.
+</ParamField>
+
+<ParamField path="coordinateType" type="'cartesian' | 'polar' | 'geo'">
+  Explicitly sets the coordinate system type. Usually auto-detected, but required
+  when using `coordinates` positioning on charts with multiple coordinate types.
+  Since v1.11.0.
+</ParamField>
+
+## Data Position Types
+
+Markers can target positions using these value types for `x`, `y`, `x1`, `y1`, etc.:
+
+```typescript
+type IDataPos =
+  | string            // axis value, e.g. "Jan"
+  | number            // axis value, e.g. 100
+  | 'sum'             // aggregate: sum of all values
+  | 'average'         // aggregate: mean
+  | 'min'             // aggregate: minimum value
+  | 'max'             // aggregate: maximum value
+  | 'variance'        // aggregate: variance
+  | 'standardDeviation'
+  | 'median'
+
+// Percentage string positions relative to the region:
+// '15%' = 15% from left (for x) or from top (for y)
+```
+
+---
+
+## `markLine` Spec
+
+Mark lines draw reference lines across the chart. They can span the full axis, connect two coordinates, or follow a data regression.
+
+### Positioning Variants
+
+<ParamField path="x" type="IDataPos | IDataPosCallback">
+  Draws a **vertical reference line** spanning the full Y extent at the given X
+  position. The most common usage for categorical X axes:
+
+  ```json
+  { "x": "Mar" }
+  ```
+
+  For continuous axes, use an aggregate: `{ "x": "average" }`  
+  For a percentage position: `{ "x": "50%" }`
+</ParamField>
+
+<ParamField path="y" type="IDataPos | IDataPosCallback">
+  Draws a **horizontal reference line** spanning the full X extent at the given
+  Y value.
+
+  ```json
+  { "y": "average" }
+  ```
+</ParamField>
+
+<ParamField path="x, y, x1, y1" type="IDataPos | IDataPosCallback">
+  Draws a **diagonal line** from point `(x, y)` to `(x1, y1)`. Since v1.7.3
+  you can also use `(x, y, y1)` to draw a vertical segment at `x` from `y` to
+  `y1`, or `(y, x, x1)` to draw a horizontal segment at `y` from `x` to `x1`.
+</ParamField>
+
+<ParamField path="coordinates" type="IDataPointSpec[] | function">
+  Draws a line through a sequence of **data-bound coordinates**. Each coordinate
+  maps data field values to positions. A `process` option supports linear
+  regression (`xy: "regression"`).
+
+  ```json
+  {
+    "coordinates": [
+      { "month": "Jan", "sales": 120 },
+      { "month": "Mar", "sales": 180 }
+    ]
+  }
+  ```
+
+  Since v1.12.0 also accepts a callback `(seriesData, relativeSeries) => IDataPointSpec[]`.
+</ParamField>
+
+<ParamField path="positions" type="MarkerPositionPoint[] | function">
+  Draws a line through **canvas-absolute positions**. Each point has `x` and `y`
+  as pixel values or percentage strings relative to the canvas or region.
+
+  ```json
+  {
+    "positions": [{ "x": 100, "y": 200 }, { "x": 300, "y": 100 }],
+    "regionRelative": true
+  }
+  ```
+</ParamField>
+
+### Appearance
+
+<ParamField path="line" type="object">
+  The style of the reference line itself.
+
+  ```json
+  {
+    "line": {
+      "style": {
+        "stroke": "#ff6b35",
+        "lineWidth": 2,
+        "lineDash": [8, 4],
+        "opacity": 0.8
+      },
+      "state": {
+        "hover": { "lineWidth": 3 }
+      }
+    }
+  }
+  ```
+
+  The `line.style` is an `ILineMarkSpec` or style callback
+  `(markerData, context) => ILineMarkSpec`. Supports multi-segment styling via
+  `multiSegment: true` and `mainSegmentIndex`.
+</ParamField>
+
+<ParamField path="label" type="IMarkLineLabel | IMarkLineLabel[]">
+  The text label attached to the line. Supports all `IMarkerLabelSpec` fields
+  plus a `position` that controls placement relative to the line.
+
+  ```json
+  {
+    "label": {
+      "visible": true,
+      "text": "Average",
+      "position": "insideEndTop",
+      "style": { "fill": "#333", "fontSize": 12 },
+      "labelBackground": {
+        "visible": true,
+        "padding": 4,
+        "style": { "fill": "#ffe0cc", "cornerRadius": 3 }
+      },
+      "dx": 4,
+      "dy": -2,
+      "confine": true
+    }
+  }
+  ```
+
+  Since v1.13.9, an array can be passed to display multiple labels per line.
+</ParamField>
+
+<ParamField path="startSymbol" type="IMarkerSymbol">
+  The symbol marker at the **start** of the line.
+
+  ```json
+  {
+    "startSymbol": {
+      "visible": true,
+      "symbolType": "circle",
+      "size": 8,
+      "style": { "fill": "#1664FF", "stroke": "#fff", "lineWidth": 2 }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="endSymbol" type="IMarkerSymbol">
+  The symbol marker at the **end** of the line.
+
+  ```json
+  {
+    "endSymbol": {
+      "visible": true,
+      "symbolType": "triangleRight",
+      "size": 10,
+      "style": { "fill": "#e83e3e" },
+      "refX": -4
+    }
+  }
+  ```
+
+  `IMarkerSymbol` fields: `visible`, `symbolType`, `size`, `style`, `state`,
+  `refX` (offset along the line), `refY` (offset perpendicular to line),
+  `refAngle`.
+</ParamField>
+
+### Step Mark Line
+
+A special mark line type that connects two points with a staircase path:
+
+```json
+{
+  "markLine": [
+    {
+      "type": "type-step",
+      "connectDirection": "right",
+      "expandDistance": "20%",
+      "coordinates": [
+        { "month": "Jan", "sales": 120 },
+        { "month": "Mar", "sales": 180 }
+      ],
+      "line": {
+        "style": { "stroke": "#5B8FF9", "lineWidth": 2 }
+      },
+      "label": { "visible": true, "text": "Jan → Mar" }
+    }
+  ]
+}
+```
+
+<ParamField path="type" type="'type-step'">
+  Activates the step (staircase) connection mode.
+</ParamField>
+
+<ParamField path="connectDirection" type="'top' | 'bottom' | 'left' | 'right'">
+  The direction in which the step extends before connecting to the endpoint.
+</ParamField>
+
+<ParamField path="expandDistance" type="number | string | function" default="0">
+  How far the step extends in the `connectDirection` before turning. Accepts
+  pixels, percentage strings (relative to region width/height), or a callback.
+</ParamField>
+
+---
+
+## `markArea` Spec
+
+Mark areas draw filled rectangular (or polygon) regions to highlight ranges on the chart.
+
+### Positioning Variants
+
+<ParamField path="x, x1" type="IDataPos | IDataPosCallback">
+  Draws a **vertical band** between `x` and `x1` spanning the full Y extent.
+
+  ```json
+  { "x": "Feb", "x1": "Apr" }
+  ```
+</ParamField>
+
+<ParamField path="y, y1" type="IDataPos | IDataPosCallback">
+  Draws a **horizontal band** between `y` and `y1` spanning the full X extent.
+
+  ```json
+  { "y": 100, "y1": 200 }
+  ```
+</ParamField>
+
+<ParamField path="x, x1, y, y1" type="IDataPos | IDataPosCallback">
+  Draws a **rectangular region** bounded by both X and Y ranges.
+
+  ```json
+  { "x": "Jan", "x1": "Mar", "y": 100, "y1": 300 }
+  ```
+</ParamField>
+
+<ParamField path="coordinates" type="IDataPointSpec[] | function">
+  Draws an area shape through **data-bound polygon vertices**. The polygon is
+  closed automatically.
+</ParamField>
+
+<ParamField path="coordinatesOffset" type="OffsetPoint[]">
+  Per-vertex pixel offsets applied after the data coordinates are projected to
+  canvas positions. Each element corresponds to one coordinate point.
+</ParamField>
+
+### Appearance
+
+<ParamField path="area" type="object">
+  The fill style for the marked region.
+
+  ```json
+  {
+    "area": {
+      "style": {
+        "fill": "rgba(22, 100, 255, 0.1)",
+        "stroke": "rgba(22, 100, 255, 0.3)",
+        "lineWidth": 1
+      },
+      "state": {
+        "hover": { "fill": "rgba(22, 100, 255, 0.2)" }
+      }
+    }
+  }
+  ```
+
+  The `area.style` is an `IPolygonMarkSpec` (or `IArcMarkSpec` for polar charts)
+  or a callback `(markerData, context) => IPolygonMarkSpec`.
+</ParamField>
+
+<ParamField path="label" type="IMarkAreaLabel | IMarkAreaLabel[]">
+  The text label for the area. Shares fields with `IMarkerLabelWithoutRefSpec`
+  plus a `position` controlling placement within the area.
+
+  ```json
+  {
+    "label": {
+      "visible": true,
+      "text": "Target Zone",
+      "position": "insideTop",
+      "style": { "fill": "#1664FF", "fontSize": 12, "fontWeight": "bold" }
+    }
+  }
+  ```
+
+  Available positions include `"insideTop"`, `"insideBottom"`, `"insideLeft"`,
+  `"insideRight"`, `"insideCenter"`. Since v1.13.9, accepts an array for
+  multiple labels.
+</ParamField>
+
+### Polar Mark Areas
+
+For polar/radar charts, use `angle`/`angle1` and `radius`/`radius1`:
+
+```json
+{
+  "markArea": [
+    {
+      "angle": 0,
+      "angle1": 60,
+      "radius": 50,
+      "radius1": 100,
+      "area": { "style": { "fill": "rgba(255, 165, 0, 0.2)" } }
+    }
+  ]
+}
+```
+
+---
+
+## `markPoint` Spec
+
+Mark points draw a callout annotation anchored to a specific data point, with a leader line and customizable content (text, symbol, image, or custom mark).
+
+### Positioning Variants
+
+<ParamField path="coordinate" type="IDataPointSpec | function">
+  Anchors the mark point to a **specific data record** identified by field values.
+
+  ```json
+  {
+    "coordinate": { "month": "Mar", "sales": "max" }
+  }
+  ```
+
+  Since v1.12.0, accepts a callback `(seriesData, relativeSeries) => IDataPointSpec`.
+</ParamField>
+
+<ParamField path="x, y" type="IDataPos | IDataPosCallback">
+  Anchors the mark point at a specific **axis position** on both X and Y.
+
+  ```json
+  { "x": "Feb", "y": 200 }
+  ```
+</ParamField>
+
+<ParamField path="position" type="MarkerPositionPoint | function">
+  Anchors at an **absolute canvas position** (`{ x, y }` in pixels or
+  percentage).
+
+  ```json
+  { "position": { "x": "50%", "y": "30%" }, "regionRelative": true }
+  ```
+</ParamField>
+
+<ParamField path="coordinatesOffset" type="OffsetPoint">
+  A single `{ x, y }` pixel offset applied after the data coordinate is
+  projected to canvas. Since v1.7.3.
+</ParamField>
+
+### Appearance
+
+<ParamField path="itemContent" type="IItemContent">
+  The annotation content displayed near the anchor point. Supports four
+  `type` values:
+
+  - `"text"` — a text label (default)
+  - `"symbol"` — an icon/shape
+  - `"image"` — a raster image
+  - `"custom"` — a fully custom mark group
+
+  ```json
+  {
+    "itemContent": {
+      "type": "text",
+      "position": "top",
+      "offsetY": -10,
+      "text": {
+        "visible": true,
+        "text": "Peak",
+        "style": { "fill": "#333", "fontSize": 13 },
+        "labelBackground": {
+          "visible": true,
+          "padding": 4,
+          "style": { "fill": "#fff6e0", "stroke": "#f5a623", "cornerRadius": 3 }
+        }
+      }
+    }
+  }
+  ```
+
+  Key `IItemContent` sub-fields:
+  - `type` — `"symbol"` | `"text"` | `"image"` | `"custom"`
+  - `position` — where the content sits relative to the anchor point
+  - `offsetX` / `offsetY` — pixel nudge, also accepts `"regionRight"`, `"regionLeft"`, `"regionTop"`, `"regionBottom"`
+  - `confine` — keep content within the visible region (since v1.8.7)
+  - `refX` / `refY` — offset along/perpendicular to the leader line
+  - `style` — the content mark style or callback
+</ParamField>
+
+<ParamField path="itemLine" type="IItemLine">
+  The leader line that connects the anchor point to the `itemContent`.
+
+  ```json
+  {
+    "itemLine": {
+      "visible": true,
+      "type": "type-op",
+      "line": {
+        "style": { "stroke": "#666", "lineWidth": 1, "lineDash": [4, 2] }
+      },
+      "startSymbol": { "visible": false },
+      "endSymbol": {
+        "visible": true,
+        "symbolType": "circle",
+        "size": 6,
+        "style": { "fill": "#e83e3e" }
+      },
+      "decorativeLine": { "visible": true, "length": 8 }
+    }
+  }
+  ```
+
+  Leader line types:
+  - `"type-s"` — straight line from anchor to content
+  - `"type-do"` — one elbow at the midpoint X, same Y as start
+  - `"type-op"` — one elbow at start X, endpoint Y
+  - `"type-po"` — one elbow at endpoint X, start Y
+  - `"type-arc"` — curved arc line (configure curvature with `arcRatio`)
+</ParamField>
+
+<ParamField path="targetSymbol" type="object">
+  A symbol mark drawn around the data point itself (beneath the leader line
+  start) to visually highlight the target. Since v1.11.1.
+
+  ```json
+  {
+    "targetSymbol": {
+      "visible": true,
+      "size": 20,
+      "offset": 4,
+      "style": { "fill": "none", "stroke": "#e83e3e", "lineWidth": 2 }
+    }
+  }
+  ```
+</ParamField>
+
+---
+
+## Cross-series Markers
+
+Markers can span across series (e.g., from series A's domain to series B's domain) using `startRelativeSeriesIndex`/`endRelativeSeriesIndex`:
+
+```json
+{
+  "markLine": [
+    {
+      "startRelativeSeriesIndex": 0,
+      "endRelativeSeriesIndex": 1,
+      "x": "average",
+      "line": { "style": { "stroke": "#999", "lineDash": [4, 4] } }
+    }
+  ]
+}
+```
+
+<ParamField path="startRelativeSeriesIndex" type="number">
+  The series index used to resolve the **start** coordinate of the marker.
+</ParamField>
+
+<ParamField path="endRelativeSeriesIndex" type="number">
+  The series index used to resolve the **end** coordinate of the marker.
+</ParamField>
+
+<ParamField path="startRelativeSeriesId" type="string">
+  The series `id` for the start coordinate. Alternative to index-based reference.
+</ParamField>
+
+<ParamField path="endRelativeSeriesId" type="string">
+  The series `id` for the end coordinate.
+</ParamField>
+
+<ParamField path="specifiedDataSeriesIndex" type="'all' | number | number[]">
+  The series used for data aggregation computations (e.g. `average`). Set to
+  `"all"` to aggregate across every series in the region. Since v1.11.0.
+</ParamField>
+
+---
+
+## Marker Summary
+
+<CardGroup cols={3}>
+  <Card title="markLine" icon="minus">
+    Reference lines spanning axes. Use `y: "average"` for average lines,
+    `y: 100` for threshold lines, or `coordinates` for trend lines.
+  </Card>
+  <Card title="markArea" icon="square">
+    Highlighted regions. Use `y`/`y1` for horizontal bands, `x`/`x1` for
+    vertical bands, or `x`/`x1`/`y`/`y1` for rectangles.
+  </Card>
+  <Card title="markPoint" icon="location-dot">
+    Callout annotations on specific data points. Use `coordinate` with an
+    aggregate like `"max"` to automatically highlight extreme values.
+  </Card>
+</CardGroup>
+
+<Warning>
+  Markers using `x`, `y`, etc. with aggregation types like `"average"` or
+  `"max"` require the marker to be associated with a series that contains
+  numeric data. Set `relativeSeriesIndex` or `relativeSeriesId` explicitly when
+  your chart has multiple series with different data shapes.
+</Warning>

@@ -1,0 +1,476 @@
+---
+title: "VChart Render, Update, and Data Methods"
+sidebarTitle: "Render & Update"
+description: "Full reference for VChart instance methods covering rendering, data updates, spec mutations, viewport control, coordinate conversion, and DOM access."
+---
+
+Once you have constructed a `VChart` instance with `new VChart(spec, options)`, you drive its lifecycle through the instance methods documented on this page. The pattern is always the same: call `renderSync()` (or its async twin) for the initial render, then use the data and spec update methods to mutate the chart without rebuilding it from scratch. VChart computes a minimal diff of what changed and re-renders only the affected portions of the scene graph, keeping updates fast even for large datasets.
+
+---
+
+## Render Methods
+
+### `renderSync(morphConfig?)`
+
+**Synchronous.** Initialises the chart internals if this is the first render, compiles the spec to VGrammar, and tells the VRender stage to draw. Returns the VChart instance so you can chain calls.
+
+<ParamField path="morphConfig" type="IMorphConfig">
+  Optional morph animation configuration. When provided, marks from the previous chart state will animate into the new positions — useful when switching chart types.
+
+  ```ts
+  interface IMorphConfig {
+    morph?: boolean;          // enable/disable morphing, default true
+    morphKey?: string;        // custom key to match marks across updates
+    morphElementKey?: string; // element-level matching key
+  }
+  ```
+</ParamField>
+
+**Returns:** `IVChart`
+
+```ts
+const chart = new VChart(spec, { dom: 'container' });
+chart.renderSync(); // initial synchronous render
+```
+
+### `renderAsync(morphConfig?)`
+
+**Asynchronous.** Functionally identical to `renderSync` but returns a `Promise<IVChart>`. In the current implementation both methods execute synchronously — the async variant exists for API consistency in async-first frameworks.
+
+<ParamField path="morphConfig" type="IMorphConfig">
+  Same as `renderSync`.
+</ParamField>
+
+**Returns:** `Promise<IVChart>`
+
+```ts
+const chart = new VChart(spec, { dom: 'container' });
+await chart.renderAsync();
+```
+
+### `release()`
+
+Destroys the chart instance completely. Releases the VRender stage, disconnects the `ResizeObserver`, clears all event listeners, nulls all internal references, and removes the instance from `InstanceManager`. After calling `release()` the instance should not be used again.
+
+```ts
+chart.release();
+```
+
+<Warning>
+Failing to call `release()` before removing a chart's container from the DOM will leak memory through the `ResizeObserver` and event handlers.
+</Warning>
+
+---
+
+## Data Methods
+
+### `updateData(id, data, options?)`
+
+**Asynchronous.** Updates a named data source by its `id` or `name`. If the chart has already been rendered the data layer is updated in place and the canvas is re-rendered. If called before the first render the spec's `data` array is patched.
+
+<ParamField path="id" type="string | number" required>
+  The `id` (or `name`) of the data source to update, as declared in `spec.data`.
+</ParamField>
+
+<ParamField path="data" type="DataView | Datum[] | string" required>
+  New data — an array of datum objects, a serialised JSON string, or a `DataView` instance.
+</ParamField>
+
+<ParamField path="options" type="IParserOptions">
+  Optional parser options forwarded to `@visactor/vdataset` when `data` is a `DataView` reference.
+</ParamField>
+
+**Returns:** `Promise<IVChart>`
+
+```ts
+await chart.updateData('sales', [
+  { month: 'Jan', revenue: 4200 },
+  { month: 'Feb', revenue: 5100 }
+]);
+```
+
+### `updateDataSync(id, data, options?)`
+
+**Synchronous** equivalent of `updateData`.
+
+<ParamField path="id" type="string | number" required>
+  Data source `id` or `name`.
+</ParamField>
+
+<ParamField path="data" type="DataView | Datum[] | string" required>
+  New data values.
+</ParamField>
+
+<ParamField path="options" type="IParserOptions">
+  Optional parser options.
+</ParamField>
+
+**Returns:** `IVChart`
+
+### `updateDataInBatches(list)`
+
+**Asynchronous.** Updates multiple named data sources in a single call, triggering only one re-render pass.
+
+<ParamField path="list" type="{ id: string; data: Datum[]; options?: IParserOptions }[]" required>
+  Array of update objects, each with an `id`, `data` array, and optional parser `options`.
+</ParamField>
+
+**Returns:** `Promise<IVChart>`
+
+```ts
+await chart.updateDataInBatches([
+  { id: 'series-a', data: seriesAData },
+  { id: 'series-b', data: seriesBData }
+]);
+```
+
+### `updateFullData(data, reRender?)`
+
+**Asynchronous.** Updates one or more complete `IDataValues` objects (including `fields`, `transforms`, and `parser` metadata) as found in the spec's `data` array.
+
+<ParamField path="data" type="IDataValues | IDataValues[]" required>
+  One or more full data value objects matching the `IDataValues` interface.
+
+  ```ts
+  interface IDataValues {
+    id?: string | number;
+    values: Datum[] | string;
+    fromDataIndex?: number;
+    fromDataId?: string | number;
+    transforms?: BuildInTransformOptions[];
+    fields?: Record<string, IFieldsMeta>;
+    parser?: SheetParseOptions | CommonParseOptions;
+  }
+  ```
+</ParamField>
+
+<ParamField path="reRender" type="boolean" default="true">
+  Whether to trigger a re-render after the data update. Set to `false` to batch multiple updates before rendering manually.
+</ParamField>
+
+**Returns:** `Promise<IVChart>`
+
+### `updateFullDataSync(data, reRender?)`
+
+**Synchronous** equivalent of `updateFullData`. Available since **1.3.0**.
+
+**Returns:** `IVChart`
+
+---
+
+## Spec Methods
+
+### `updateSpec(spec, forceMerge?, morphConfig?)`
+
+**Asynchronous.** Replaces or merges the chart's current spec and re-renders. VChart computes a diff to determine if a full chart rebuild (`reMake`), a re-compile, or only a local update is needed.
+
+<ParamField path="spec" type="ISpec" required>
+  The new (or partial, when `forceMerge` is `true`) spec object.
+</ParamField>
+
+<ParamField path="forceMerge" type="boolean" default="false">
+  When `true`, the incoming spec is **deep-merged** into the existing spec rather than replacing it. Useful for patching a single field without supplying the entire spec.
+</ParamField>
+
+<ParamField path="morphConfig" type="IMorphConfig">
+  Optional morph animation configuration for the re-render.
+</ParamField>
+
+**Returns:** `Promise<IVChart>`
+
+```ts
+// Switch from a bar chart to a line chart with morph animation
+await chart.updateSpec(
+  { ...currentSpec, type: 'line' },
+  false,
+  { morph: true }
+);
+```
+
+### `updateSpecSync(spec, forceMerge?, morphConfig?)`
+
+**Synchronous** equivalent of `updateSpec`.
+
+**Returns:** `IVChart`
+
+### `updateModelSpec(filter, spec, forceMerge?, morphConfig?)`
+
+**Asynchronous.** Updates the spec of a **single model** (series, axis, legend, etc.) identified by the `filter` without touching the rest of the chart. Available since **1.4.0**.
+
+<ParamField path="filter" type="string | { type: string; index: number } | ((model: IModel) => boolean)" required>
+  Selector for the target model:
+  - A **string** is treated as the model's `userId`.
+  - An **object** `{ type, index }` selects by type (e.g. `'line'`) and zero-based index.
+  - A **function** receives each model and returns `true` to select it.
+</ParamField>
+
+<ParamField path="spec" type="unknown" required>
+  Partial or full spec fragment to apply to the matched model.
+</ParamField>
+
+<ParamField path="forceMerge" type="boolean" default="false">
+  Deep-merge the incoming fragment with the model's existing spec instead of replacing it.
+</ParamField>
+
+<ParamField path="morphConfig" type="IMorphConfig">
+  Optional morph animation config.
+</ParamField>
+
+**Returns:** `Promise<IVChart>`
+
+```ts
+// Update just the first bar series colour
+await chart.updateModelSpec(
+  { type: 'bar', index: 0 },
+  { bar: { style: { fill: 'steelblue' } } }
+);
+```
+
+### `updateModelSpecSync(filter, spec, forceMerge?, morphConfig?)`
+
+**Synchronous** equivalent of `updateModelSpec`.
+
+**Returns:** `IVChart`
+
+### `getSpec()`
+
+Returns the current **internal** spec object (after all spec transforms have been applied). Do not mutate the returned object directly — use `updateSpec` instead.
+
+**Returns:** `ISpec`
+
+### `getSpecInfo()`
+
+Returns the processed `IChartSpecInfo` object containing detailed metadata about every series, region, axis, component, and data source inferred from the spec.
+
+**Returns:** `IChartSpecInfo`
+
+---
+
+## Viewport Methods
+
+### `resize(width, height)`
+
+**Asynchronous.** Resizes the chart canvas to the given pixel dimensions and re-renders.
+
+<ParamField path="width" type="number" required>
+  New canvas width in pixels.
+</ParamField>
+
+<ParamField path="height" type="number" required>
+  New canvas height in pixels.
+</ParamField>
+
+**Returns:** `Promise<IVChart>`
+
+### `resizeSync(width, height)`
+
+**Synchronous** equivalent of `resize`.
+
+**Returns:** `IVChart`
+
+```ts
+window.addEventListener('resize', () => {
+  chart.resizeSync(container.clientWidth, container.clientHeight);
+});
+```
+
+### `updateViewBox(viewBox, reRender?, reLayout?)`
+
+Restricts the chart drawing area to a sub-rectangle of the canvas without changing the canvas dimensions. Useful for inset charts or when multiple charts share one canvas.
+
+<ParamField path="viewBox" type="IBoundsLike" required>
+  The clipping rectangle `{ x1, y1, x2, y2 }`.
+</ParamField>
+
+<ParamField path="reRender" type="boolean" default="true">
+  Whether to trigger a render after applying the view box.
+</ParamField>
+
+<ParamField path="reLayout" type="boolean" default="true">
+  Whether to re-run the layout calculation after changing the view box.
+</ParamField>
+
+**Returns:** `IVChart`
+
+---
+
+## Accessor Methods
+
+These methods expose internal chart objects for advanced integration or custom drawing.
+
+<Accordion title="getStage()">
+Returns the underlying VRender `IStage` instance. The stage is the root of the scene graph and gives you direct access to the rendering pipeline.
+
+```ts
+const stage = chart.getStage();
+stage.render(); // force a synchronous frame
+```
+</Accordion>
+
+<Accordion title="getChart()">
+Returns the internal `IChart` object, which owns all regions, series, and components. Useful when you need low-level access to series data or region layout information.
+
+```ts
+const internal = chart.getChart();
+const allSeries = internal?.getAllSeries();
+```
+</Accordion>
+
+<Accordion title="getCanvas()">
+Returns the `HTMLCanvasElement` used for rendering, or `undefined` in non-browser environments.
+</Accordion>
+
+<Accordion title="getContainer()">
+Returns the DOM container element (`HTMLElement`) associated with this instance. Resolves the container via `dom`, `renderCanvas`, or `stage` in that priority order.
+</Accordion>
+
+<Accordion title="getComponents()">
+Returns an array of all instantiated `IComponent` instances — axes, legends, tooltips, data zooms, etc.
+
+```ts
+const components = chart.getComponents();
+```
+</Accordion>
+
+---
+
+## Export Methods
+
+### `getDataURL()`
+
+**Asynchronous.** Forces one synchronous render pass to ensure the canvas is complete, then returns a `data:` URI string suitable for `<img src>` or download links.
+
+**Returns:** `Promise<string | null>`
+
+```ts
+const url = await chart.getDataURL();
+document.getElementById('preview').src = url;
+```
+
+### `exportImg(name?)`
+
+**Asynchronous. Browser only.** Downloads the chart as a PNG image file. Internally calls `getDataURL()` and triggers a browser download.
+
+<ParamField path="name" type="string">
+  The filename for the downloaded image (without extension). Defaults to a generated name.
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### `exportCanvas()`
+
+Synchronously exports the chart drawing onto a new `HTMLCanvasElement` via `stage.toCanvas()`. Returns the canvas element, or `undefined` if the stage is not initialised.
+
+**Returns:** `HTMLCanvasElement | undefined`
+
+---
+
+## Coordinate Conversion
+
+### `convertDatumToPosition(datum, dataLinkInfo?, isRelativeToCanvas?, checkInViewData?)`
+
+Converts a data record (as it appears in your dataset) to canvas pixel coordinates by looking up the datum in the series' processed view data.
+
+<ParamField path="datum" type="Datum" required>
+  A data object whose fields match entries in the series data.
+</ParamField>
+
+<ParamField path="dataLinkInfo" type="DataLinkSeries" default="{ seriesIndex: 0 }">
+  Specifies which series to use for the conversion. Provide either `seriesId` or `seriesIndex`.
+
+  ```ts
+  type DataLinkSeries = { seriesId?: string | number; seriesIndex?: number };
+  ```
+</ParamField>
+
+<ParamField path="isRelativeToCanvas" type="boolean" default="false">
+  When `true` the returned point is relative to the canvas origin. When `false` it is relative to the series region.
+</ParamField>
+
+<ParamField path="checkInViewData" type="boolean">
+  When `true`, returns `null` if the datum's graphic element is outside the current viewport (e.g. filtered out by a data zoom).
+</ParamField>
+
+**Returns:** `IPoint | null`
+
+```ts
+const point = chart.convertDatumToPosition(
+  { month: 'Jan', revenue: 4200 },
+  { seriesIndex: 0 },
+  true
+);
+// point => { x: 142, y: 308 }
+```
+
+### `convertValueToPosition(value, dataLinkInfo, isRelativeToCanvas?)`
+
+Converts a raw axis value (not necessarily from the dataset) to a pixel position along that axis.
+
+<Tabs>
+  <Tab title="Single axis value">
+    Pass a scalar value and link to an axis by `axisId` or `axisIndex`.
+
+    <ParamField path="value" type="string | number" required>
+      The axis value to convert.
+    </ParamField>
+
+    <ParamField path="dataLinkInfo" type="DataLinkAxis" required>
+      `{ axisId?: string | number; axisIndex?: number }`
+    </ParamField>
+
+    **Returns:** `number | null`
+
+    ```ts
+    const xPixel = chart.convertValueToPosition(50, { axisIndex: 0 });
+    ```
+  </Tab>
+  <Tab title="Two-dimensional value">
+    Pass a `[x, y]` tuple and link to a series. Returns the `IPoint`.
+
+    <ParamField path="value" type="[string | number, string | number]" required>
+      The `[xValue, yValue]` tuple to convert.
+    </ParamField>
+
+    <ParamField path="dataLinkInfo" type="DataLinkSeries" required>
+      `{ seriesId?: string | number; seriesIndex?: number }`
+    </ParamField>
+
+    **Returns:** `IPoint | null`
+
+    ```ts
+    const point = chart.convertValueToPosition(
+      ['Jan', 4200],
+      { seriesIndex: 0 }
+    );
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## Dimension Index
+
+### `setDimensionIndex(value, opt?)`
+
+Programmatically triggers the **dimension hover** interaction — the same effect as hovering over a category on the x-axis. This activates crosshairs, tooltips, and any mark state changes associated with that dimension value.
+
+<ParamField path="value" type="string | number" required>
+  The dimension (category) value to activate.
+</ParamField>
+
+<ParamField path="opt" type="DimensionIndexOption">
+  Fine-grained control over which interaction effects fire.
+
+  ```ts
+  interface DimensionIndexOption {
+    tooltip?: boolean;     // show tooltip, default true
+    crosshair?: boolean;   // show crosshair, default true
+    action?: string;       // interaction action name
+  }
+  ```
+</ParamField>
+
+```ts
+// Trigger hover effects for the "February" category
+chart.setDimensionIndex('February', { tooltip: true, crosshair: true });
+```

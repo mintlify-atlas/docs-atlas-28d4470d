@@ -1,0 +1,334 @@
+---
+title: "VChart Class: Constructor and Static Methods"
+sidebarTitle: "VChart Class"
+description: "Complete reference for the VChart constructor, IInitOption fields, static registration helpers, map utilities, and global state management properties."
+---
+
+The `VChart` class is the central entry point for every chart you create. You instantiate it with a declarative JSON **spec** and an **options** object, call `renderSync()` or `renderAsync()`, and the library takes care of the entire rendering pipeline — from data transformation and layout through VRender GPU-accelerated drawing. Beyond individual instances, `VChart` exposes a rich collection of **static methods** for registering chart types, series, components, marks, custom functions, and map data, as well as static properties that give global access to the theme system, instance manager, and utility helpers.
+
+## Constructor
+
+```ts
+new VChart(spec: ISpec, options: IInitOption): VChart
+```
+
+Creates and initialises a new VChart instance. The constructor registers the environment (browser or Node.js), sets up the internal `DataSet`, wires resize observers when `autoFit` is enabled, and registers the instance with `InstanceManager`.
+
+<Note>
+In browser environments you must supply at least one of `dom`, `renderCanvas`, or `stage` inside `options`. In Node.js (`mode: 'node'`) these are optional.
+</Note>
+
+### Parameters
+
+<ParamField path="spec" type="ISpec" required>
+  The declarative chart specification object. Must contain at minimum a `type` field (e.g. `"bar"`, `"line"`, `"pie"`). All series, axes, legend, tooltip, theme, and data configuration lives inside this object.
+</ParamField>
+
+<ParamField path="options" type="IInitOption" required>
+  Initialisation options that control the rendering environment, container, data set, animations, theming, and error handling. See the full field list below.
+</ParamField>
+
+### IInitOption Fields
+
+<ParamField path="dom" type="string | HTMLElement">
+  **Browser only.** The parent container element to mount the chart canvas into. Accepts a DOM element reference or an element `id` string.
+</ParamField>
+
+<ParamField path="renderCanvas" type="string | HTMLCanvasElement">
+  An existing `<canvas>` element (or its `id` string) to draw into instead of creating a new one. Required in mini-program environments where `dom` is unavailable — pass the canvas `id` string.
+</ParamField>
+
+<ParamField path="dataSet" type="DataSet">
+  An externally created `@visactor/vdataset` `DataSet` instance. When omitted a new `DataSet` is created internally. Pass a shared instance when multiple charts should reference the same data views.
+</ParamField>
+
+<ParamField path="autoFit" type="boolean" default="true">
+  Whether the chart should automatically resize when its container changes dimensions. Uses `ResizeObserver` and `window.resize`. Only applies in true browser environments. The `autoFit` field in the spec takes higher priority than this option.
+</ParamField>
+
+<ParamField path="animation" type="boolean">
+  Global animation toggle. Overrides the `animation` field on individual series when set. When omitted the spec-level `animation` flag is respected.
+</ParamField>
+
+<ParamField path="layout" type="LayoutCallBack">
+  A custom layout callback that replaces the default chart layout engine. Use this for advanced or fully custom chart positioning.
+</ParamField>
+
+<ParamField path="poptip" type="boolean" default="true">
+  Whether to show a pop-tip when text is truncated (ellipsis). Set to `false` to disable the poptip plugin entirely.
+</ParamField>
+
+<ParamField path="onError" type="(...args: any[]) => void">
+  Custom error handler invoked instead of throwing. Useful for capturing chart errors inside your application's logging or monitoring pipeline. **Since 1.2.0.**
+</ParamField>
+
+<ParamField path="theme" type="string | ITheme">
+  Default theme applied to this instance. Accepts a registered theme name string or an inline `ITheme` object. The `theme` field inside the spec has higher priority. **Since 1.3.0.**
+</ParamField>
+
+<ParamField path="mode" type="RenderModeEnum">
+  The rendering environment. Controls which environment adapters are loaded. Defaults to `'desktop-browser'`.
+
+  | Value | Environment |
+  |---|---|
+  | `'desktop-browser'` | Standard desktop browser |
+  | `'mobile-browser'` | Mobile browser |
+  | `'node'` | Node.js (server-side rendering) |
+  | `'worker'` | Web Worker |
+  | `'miniApp'` | Generic mini-program |
+  | `'wx'` | WeChat mini-program |
+  | `'tt'` | ByteDance (TikTok) mini-program |
+  | `'harmony'` | HarmonyOS |
+  | `'desktop-miniApp'` | Desktop mini-app |
+  | `'lynx'` | Lynx framework |
+</ParamField>
+
+<ParamField path="disableTriggerEvent" type="boolean" default="false">
+  Disables all built-in pointer/interaction events on the chart. Useful for static export scenarios. **Since 1.9.0.**
+</ParamField>
+
+<ParamField path="resizeDelay" type="number" default="100">
+  Throttle delay in milliseconds for the automatic resize handler. **Since 1.12.5.**
+</ParamField>
+
+### Example
+
+```ts
+import VChart from '@visactor/vchart';
+
+const chart = new VChart(
+  {
+    type: 'bar',
+    data: [{ id: 'sales', values: [{ x: 'Q1', y: 100 }, { x: 'Q2', y: 200 }] }],
+    xField: 'x',
+    yField: 'y'
+  },
+  {
+    dom: 'chart-container',
+    autoFit: true,
+    animation: true,
+    onError: (err) => console.error('[VChart]', err)
+  }
+);
+
+chart.renderSync();
+```
+
+---
+
+## Static Methods
+
+Static methods are called on the `VChart` class itself, not on an instance. Most of them register capabilities (chart types, series, components, etc.) that all subsequent instances share.
+
+### Registration Helpers
+
+<Note>
+Since **1.5.1**, prefer `useRegisters` over the individual `useChart`, `useSeries`, and `useComponent` helpers. It accepts any array of register functions from `@visactor/vchart`.
+</Note>
+
+#### `VChart.useRegisters(comps)`
+
+Registers an array of chart features — charts, series, components, marks, layouts — using the standard register functions exported from `@visactor/vchart`. This is the recommended tree-shaking approach.
+
+<ParamField path="comps" type="(() => void)[]" required>
+  An array of register functions, e.g. `[registerLineChart, registerCartesianLinearAxis]`.
+</ParamField>
+
+```ts
+import VChart from '@visactor/vchart';
+import { registerLineChart, registerCartesianLinearAxis } from '@visactor/vchart';
+
+VChart.useRegisters([registerLineChart, registerCartesianLinearAxis]);
+```
+
+#### `VChart.useChart(charts)`
+
+Registers one or more custom chart constructors directly.
+
+<ParamField path="charts" type="IChartConstructor[]" required>
+  Array of chart constructor classes. Each must have a static `type` property.
+</ParamField>
+
+#### `VChart.useSeries(series)`
+
+Registers one or more custom series constructors.
+
+<ParamField path="series" type="ISeriesConstructor[]" required>
+  Array of series constructor classes.
+</ParamField>
+
+#### `VChart.useComponent(components)`
+
+Registers one or more custom component constructors (axes, legend, tooltip, etc.).
+
+<ParamField path="components" type="IComponentConstructor[]" required>
+  Array of component constructor classes.
+</ParamField>
+
+#### `VChart.useMark(marks)`
+
+Registers one or more custom mark (graphic primitive) constructors.
+
+<ParamField path="marks" type="MarkConstructor[]" required>
+  Array of mark constructor classes.
+</ParamField>
+
+#### `VChart.useLayout(layouts)`
+
+Registers one or more custom layout constructors.
+
+<ParamField path="layouts" type="ILayoutConstructor[]" required>
+  Array of layout constructor classes, each with a static `type` string.
+</ParamField>
+
+#### `VChart.registerDataSetTransform(name, transform)`
+
+Registers a named data transform function into the global `DataSet` factory. All subsequently created `DataSet` instances will have access to this transform.
+
+<ParamField path="name" type="string" required>
+  Unique name for the transform (e.g. `'myNormalize'`).
+</ParamField>
+
+<ParamField path="transform" type="Transform" required>
+  The transform implementation conforming to the `@visactor/vdataset` `Transform` interface.
+</ParamField>
+
+---
+
+### Expression Functions
+
+VChart supports referencing JavaScript functions by name in spec strings. These static helpers manage the global function registry.
+
+#### `VChart.registerFunction(key, fun)`
+
+Registers a named function globally so it can be referenced by name in spec expressions.
+
+<ParamField path="key" type="string" required>
+  The function name as it will appear in spec strings.
+</ParamField>
+
+<ParamField path="fun" type="Function" required>
+  The function implementation.
+</ParamField>
+
+#### `VChart.unregisterFunction(key)`
+
+Removes a previously registered function from the global registry.
+
+<ParamField path="key" type="string" required>
+  The function name to remove.
+</ParamField>
+
+#### `VChart.getFunction(key)`
+
+Returns a registered function by name, or `null` if not found.
+
+<ParamField path="key" type="string" required>
+  The function name to look up.
+</ParamField>
+
+**Returns:** `Function | null`
+
+#### `VChart.getFunctionList()`
+
+Returns an array of all registered function name strings.
+
+**Returns:** `string[] | null`
+
+---
+
+### Map Data
+
+These methods manage geo-map data used by the `map` chart type. Map data must be registered before any map chart is instantiated.
+
+#### `VChart.registerMap(key, source, option?)`
+
+<ParamField path="key" type="string" required>
+  Unique name for the map dataset (e.g. `'world'`, `'china'`).
+</ParamField>
+
+<ParamField path="source" type="GeoSourceType" required>
+  The GeoJSON or other geo-source object.
+</ParamField>
+
+<ParamField path="option" type="GeoSourceOption">
+  Optional parser/projection options.
+</ParamField>
+
+#### `VChart.unregisterMap(key)`
+
+Removes a previously registered map dataset.
+
+<ParamField path="key" type="string" required>
+  The map name to remove.
+</ParamField>
+
+#### `VChart.getMap(key)`
+
+Returns the raw geo-source data for a registered map.
+
+<ParamField path="key" type="string" required>
+  The map name.
+</ParamField>
+
+**Returns:** `GeoSourceType`
+
+---
+
+### SVG Registration
+
+#### `VChart.registerSVG(key, source, option?)`
+
+Registers an SVG source for use in SVG-based map visualisations.
+
+<ParamField path="key" type="string" required>
+  Unique name for the SVG source.
+</ParamField>
+
+<ParamField path="source" type="GeoSourceType" required>
+  The SVG source data.
+</ParamField>
+
+<ParamField path="option" type="GeoSourceOption">
+  Optional configuration.
+</ParamField>
+
+---
+
+### Tooltip and Logger
+
+#### `VChart.hideTooltip(excludeId?)`
+
+Hides the tooltip on all registered VChart instances simultaneously. Useful when navigating away from a page.
+
+<ParamField path="excludeId" type="number | number[]">
+  Optional instance ID(s) to exclude from the hide operation.
+</ParamField>
+
+#### `VChart.getLogger()`
+
+Returns the shared `ILogger` instance used by all VChart internals.
+
+**Returns:** `ILogger`
+
+---
+
+## Static Properties
+
+<CardGroup cols={2}>
+  <Card title="ThemeManager" icon="palette">
+    `VChart.ThemeManager` — static reference to the `ThemeManager` class. Use it to register, retrieve, and switch themes globally across all instances. See the [Theme API](/api/theme-api) page for the full reference.
+  </Card>
+  <Card title="InstanceManager" icon="grid">
+    `VChart.InstanceManager` — manages the registry of all live VChart instances. Provides `forEach`, `registerInstance`, and `unregisterInstance` for cross-instance operations.
+  </Card>
+  <Card title="globalConfig" icon="gear">
+    `VChart.globalConfig: IGlobalConfig` — mutable global settings object. Currently supports `uniqueTooltip: boolean` (default `true`), which ensures only one tooltip is shown across all chart instances at a time.
+  </Card>
+  <Card title="Utils" icon="wrench">
+    `VChart.Utils` — exposes a set of utility helpers used internally by VChart, accessible for advanced customisation scenarios.
+  </Card>
+  <Card title="vglobal" icon="globe">
+    `VChart.vglobal` — the cross-environment global object bridge from VRender. Provides environment-agnostic access to DOM-like APIs (`getElementById`, etc.).
+  </Card>
+</CardGroup>

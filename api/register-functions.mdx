@@ -1,0 +1,403 @@
+---
+title: "VChart Register Functions for Tree-Shaking"
+sidebarTitle: "Register Functions"
+description: "Reduce bundle size with VChart's register functions. Selectively include only the chart types, axes, components, and interactions your app needs."
+---
+
+By default, importing `@visactor/vchart` gives you a fully assembled instance — every chart type, every component, and every interaction are pre-registered via `vchart-all.ts`. This is the fastest way to get started, but it includes code you may never use. For production applications where bundle size matters, VChart provides a granular registration API: every chart type, axis, component, interaction, and environment has a dedicated `registerXxx` function. You collect only the ones you need and pass them as an array to `VChart.useRegisters([...])` before rendering any charts. This single call pattern is idempotent — calling the same register function more than once is safe — and integrates cleanly with any bundler's tree-shaking.
+
+## Two Usage Patterns
+
+<Tabs>
+  <Tab title="Default (All Charts)">
+    Import VChart's default export. Everything is pre-registered and ready to use. Best for prototyping or projects where bundle size is not a concern.
+
+    ```ts
+    // vchart/src/index.ts — re-exports from vchart-all.ts which
+    // calls VChart.useRegisters([...everything...]) at module load time
+    import VChart from '@visactor/vchart';
+
+    const vchart = new VChart(
+      { type: 'bar', data: [{ id: 'd', values: [{ x: 'A', y: 10 }] }], xField: 'x', yField: 'y' },
+      { dom: 'container' }
+    );
+    vchart.renderAsync();
+    ```
+
+    <Note>
+      The default import includes all 27+ chart types and all components. In a typical webpack or Rollup build this adds roughly 700 kB (minified + gzipped ~200 kB) to your bundle.
+    </Note>
+  </Tab>
+
+  <Tab title="Selective (Tree-Shakeable)">
+    Import `VChart` from its core module and call `useRegisters` with only what you need. Any module you do not import will be excluded from the final bundle.
+
+    ```ts
+    import { VChart } from '@visactor/vchart/esm/core';
+    import { registerBarChart } from '@visactor/vchart/esm/chart/bar';
+    import { registerCartesianLinearAxis, registerCartesianBandAxis }
+      from '@visactor/vchart/esm/component/axis/cartesian';
+    import { registerDiscreteLegend } from '@visactor/vchart/esm/component/legend';
+    import { registerTooltip } from '@visactor/vchart/esm/component/tooltip';
+    import { registerCartesianCrossHair } from '@visactor/vchart/esm/component/crosshair';
+    import { registerLabel } from '@visactor/vchart/esm/component/label';
+    import { registerCanvasTooltipHandler }
+      from '@visactor/vchart/esm/plugin/components/tooltip-handler';
+    import { registerAnimate } from '@visactor/vchart/esm/plugin/other';
+    import { registerBrowserEnv } from '@visactor/vchart/esm/env';
+
+    VChart.useRegisters([
+      registerBarChart,
+      registerCartesianLinearAxis,
+      registerCartesianBandAxis,
+      registerDiscreteLegend,
+      registerTooltip,
+      registerCartesianCrossHair,
+      registerLabel,
+      registerCanvasTooltipHandler,
+      registerAnimate,
+      registerBrowserEnv
+    ]);
+
+    const vchart = new VChart(
+      { type: 'bar', data: [{ id: 'd', values: [{ x: 'A', y: 10 }] }], xField: 'x', yField: 'y' },
+      { dom: 'container' }
+    );
+    vchart.renderAsync();
+    ```
+
+    <Tip>
+      Alternatively, import from the top-level `@visactor/vchart` package (not the default export) and use named imports. Modern bundlers will tree-shake unused registers automatically as long as you avoid the default import path.
+    </Tip>
+  </Tab>
+</Tabs>
+
+---
+
+## `VChart.useRegisters()`
+
+The static `useRegisters` method is the single entry point for all selective registration. It accepts an array of zero-argument functions and calls each one:
+
+```ts
+// packages/vchart/src/core/vchart.ts
+static useRegisters(comps: (() => void)[]) {
+  comps.forEach((fn: () => void) => {
+    if (typeof fn === 'function') {
+      fn();
+    } else {
+      console.error('Invalid function:', fn);
+    }
+  });
+}
+```
+
+Each register function internally calls `Factory.registerXxx(...)` to inject the feature into VChart's dependency-injection container. Call `useRegisters` once, before instantiating any `VChart` object.
+
+---
+
+## Register Function Catalog
+
+<Accordion title="Chart Types">
+
+Import from `@visactor/vchart` (tree-shakeable named exports) or the paths shown below.
+
+| Function | Chart Type | Description |
+|---|---|---|
+| `registerLineChart` | `'line'` | Line / multi-series line chart |
+| `registerAreaChart` | `'area'` | Area chart with optional stacking |
+| `registerBarChart` | `'bar'` | Vertical / horizontal bar, grouped / stacked |
+| `registerScatterChart` | `'scatter'` | Scatter / bubble chart |
+| `registerPieChart` | `'pie'` | Pie and donut chart |
+| `registerRoseChart` | `'rose'` | Nightingale / rose (polar bar) chart |
+| `registerRadarChart` | `'radar'` | Radar / spider chart |
+| `registerHistogramChart` | `'histogram'` | Frequency histogram |
+| `registerMapChart` | `'map'` | Geographic choropleth map |
+| `registerGaugeChart` | `'gauge'` | Circular gauge / speedometer |
+| `registerWordCloudChart` | `'wordCloud'` | Word cloud (also `registerWordCloudShapeChart`) |
+| `registerFunnelChart` | `'funnel'` | Funnel / pyramid chart |
+| `registerWaterfallChart` | `'waterfall'` | Waterfall (bridge) chart |
+| `registerBoxplotChart` | `'boxPlot'` | Box-and-whisker / box plot |
+| `registerCircularProgressChart` | `'circularProgress'` | Circular progress / ring gauge |
+| `registerLinearProgressChart` | `'linearProgress'` | Horizontal / vertical progress bar |
+| `registerRangeColumnChart` | `'rangeColumn'` | Floating / range column chart |
+| `registerRangeAreaChart` | `'rangeArea'` | Range area (band between two lines) |
+| `registerSunburstChart` | `'sunburst'` | Sunburst / radial treemap |
+| `registerCirclePackingChart` | `'circlePacking'` | Circle packing hierarchy |
+| `registerTreemapChart` | `'treemap'` | Rectangular treemap |
+| `registerSankeyChart` | `'sankey'` | Sankey flow diagram |
+| `registerHeatmapChart` | `'heatmap'` | Heatmap (2D grid color map) |
+| `registerSequenceChart` | `'sequence'` | Temporal sequence / event chart |
+| `registerCorrelationChart` | `'correlation'` | Correlation matrix or network |
+| `registerLiquidChart` | `'liquid'` | Liquid fill gauge (not in default bundle) |
+| `registerVennChart` | `'venn'` | Venn diagram (not in default bundle) |
+| `registerCommonChart` | `'common'` | Combination chart — required by many extension charts |
+
+```ts
+import {
+  registerLineChart,
+  registerAreaChart,
+  registerBarChart,
+  registerScatterChart,
+  registerPieChart,
+  registerRoseChart,
+  registerRadarChart,
+  registerHistogramChart,
+  registerMapChart,
+  registerGaugeChart,
+  registerWordCloudChart,
+  registerFunnelChart,
+  registerWaterfallChart,
+  registerBoxplotChart,
+  registerCircularProgressChart,
+  registerLinearProgressChart,
+  registerRangeColumnChart,
+  registerRangeAreaChart,
+  registerSunburstChart,
+  registerCirclePackingChart,
+  registerTreemapChart,
+  registerSankeyChart,
+  registerHeatmapChart,
+  registerSequenceChart,
+  registerCorrelationChart,
+  registerLiquidChart,
+  registerVennChart,
+  registerCommonChart
+} from '@visactor/vchart';
+```
+
+<Note>
+`registerLiquidChart` and `registerVennChart` are exported from `@visactor/vchart` but are **not** included in the default `vchart-all.ts` bundle to keep its size down. You must explicitly register them even if you use the default import path.
+</Note>
+
+</Accordion>
+
+<Accordion title="Axis Registers">
+
+Cartesian and polar axes are registered independently. Include only the axis types your charts require.
+
+| Function | Axis Type | Use With |
+|---|---|---|
+| `registerCartesianBandAxis` | Ordinal band axis | Bar, waterfall, histogram |
+| `registerCartesianLinearAxis` | Continuous linear axis | Line, area, scatter |
+| `registerCartesianLogAxis` | Logarithmic axis | Scatter with wide value ranges |
+| `registerCartesianSymlogAxis` | Symmetric log axis | Data containing zero or negatives |
+| `registerCartesianTimeAxis` | Time-based axis | Sequence, line with date fields |
+| `registerPolarBandAxis` | Polar band axis | Rose, radar |
+| `registerPolarLinearAxis` | Polar linear axis | Radar, rose |
+
+```ts
+import {
+  registerCartesianBandAxis,
+  registerCartesianLinearAxis,
+  registerCartesianLogAxis,
+  registerCartesianSymlogAxis,
+  registerCartesianTimeAxis,
+  registerPolarBandAxis,
+  registerPolarLinearAxis
+} from '@visactor/vchart';
+
+VChart.useRegisters([
+  registerCartesianBandAxis,
+  registerCartesianLinearAxis
+]);
+```
+
+</Accordion>
+
+<Accordion title="Component Registers">
+
+Components cover legends, tooltips, crosshairs, data zoom, markers, labels, and more.
+
+| Function | Component | Description |
+|---|---|---|
+| `registerDiscreteLegend` | Legend | Color-key legend for categorical series |
+| `registerContinuousLegend` | Legend | Gradient legend for continuous scales |
+| `registerTooltip` | Tooltip | Base tooltip coordinator (required by both handlers below) |
+| `registerDomTooltipHandler` | Tooltip | Default HTML-DOM tooltip renderer |
+| `registerCanvasTooltipHandler` | Tooltip | Canvas-drawn tooltip (for environments without DOM) |
+| `registerCartesianCrossHair` | Crosshair | X/Y axis crosshair for Cartesian charts |
+| `registerPolarCrossHair` | Crosshair | Radial crosshair for polar charts |
+| `registerDataZoom` | Data Zoom | Brush/scroll zoom control |
+| `registerScrollBar` | Scroll Bar | Scroll-based axis pan control |
+| `registerIndicator` | Indicator | Central indicator text for gauge/donut charts |
+| `registerGeoCoordinate` | Geo | Geographic coordinate system for map charts |
+| `registerMarkLine` | Marker | Horizontal / vertical reference lines |
+| `registerPolarMarkLine` | Marker | Polar reference lines |
+| `registerMarkArea` | Marker | Shaded reference band |
+| `registerPolarMarkArea` | Marker | Polar reference band |
+| `registerMarkPoint` | Marker | Callout annotation at a data point |
+| `registerPolarMarkPoint` | Marker | Polar callout annotation |
+| `registerGeoMarkPoint` | Marker | Geographic callout annotation |
+| `registerBrush` | Brush | Rectangular / lasso selection tool |
+| `registerLabel` | Label | Per-datum data labels |
+| `registerTotalLabel` | Label | Stack-total label for stacked series |
+| `registerTitle` | Title | Chart title and subtitle |
+| `registerPlayer` | Player | Animation playback controller |
+| `registerCustomMark` | Custom Mark | Arbitrary VRender graphic overlays |
+| `registerPoptip` | Poptip | Lightweight canvas-native tooltip pop-up |
+| `registerGridLayout` | Layout | Multi-panel grid layout engine |
+| `registerFormatPlugin` | Plugin | Expression-based label / tooltip formatter |
+
+```ts
+import {
+  registerDiscreteLegend,
+  registerContinuousLegend,
+  registerTooltip,
+  registerDomTooltipHandler,
+  registerCanvasTooltipHandler,
+  registerCartesianCrossHair,
+  registerPolarCrossHair,
+  registerDataZoom,
+  registerScrollBar,
+  registerIndicator,
+  registerMarkLine,
+  registerMarkArea,
+  registerMarkPoint,
+  registerBrush,
+  registerLabel,
+  registerTotalLabel,
+  registerTitle,
+  registerPlayer,
+  registerCustomMark,
+  registerGridLayout
+} from '@visactor/vchart';
+```
+
+</Accordion>
+
+<Accordion title="Interaction Registers">
+
+Interaction triggers are the built-in behaviours that respond to pointer events on chart elements. Register only the behaviours you need.
+
+| Function | Trigger | Description |
+|---|---|---|
+| `registerElementActive` | `elementActive` | Sets an active state on the hovered element |
+| `registerElementActiveByLegend` | `elementActiveByLegend` | Activates all elements belonging to a legend item on hover |
+| `registerElementHighlight` | `elementHighlight` | Highlights the hovered element and dims others |
+| `registerElementHighlightByLegend` | `elementHighlightByLegend` | Highlights all elements in the same legend group |
+| `registerElementHighlightByGroup` | `elementHighlightByGroup` | Highlights elements sharing the same group key |
+| `registerElementHighlightByKey` | `elementHighlightByKey` | Highlights elements sharing the same datum key |
+| `registerElementHighlightByName` | `elementHighlightByName` | Highlights elements matching a mark name filter |
+| `registerElementSelect` | `elementSelect` | Toggles a persistent selected state on click |
+| `registerDimensionHover` | `dimensionHover` | Highlights all elements on the same axis dimension value |
+
+```ts
+import {
+  registerElementActive,
+  registerElementActiveByLegend,
+  registerElementHighlight,
+  registerElementHighlightByLegend,
+  registerElementHighlightByGroup,
+  registerElementHighlightByKey,
+  registerElementHighlightByName,
+  registerElementSelect,
+  registerDimensionHover
+} from '@visactor/vchart';
+
+VChart.useRegisters([
+  registerElementHighlightByLegend,
+  registerElementSelect
+]);
+```
+
+</Accordion>
+
+<Accordion title="Environment Registers">
+
+VChart runs in multiple JavaScript host environments. Each environment register loads the appropriate VRender rendering adapters. Call the one that matches your deployment target.
+
+| Function | Environment | When to Use |
+|---|---|---|
+| `registerBrowserEnv` | Browser | Standard web browser (auto-selected by `VChart` constructor) |
+| `registerNodeEnv` | Node.js | Server-side rendering, image export pipelines |
+| `registerLarkEnv` | Lark / Feishu | Lark mini-program and Lark Block environments |
+| `registerWXEnv` | WeChat | WeChat Mini Program (`wx` canvas API) |
+| `registerTaroEnv` | Taro | Taro cross-platform mini-program framework |
+| `registerTTEnv` | ByteDance | ByteDance / Douyin mini-program |
+| `registerHarmonyEnv` | Harmony OS | Huawei HarmonyOS ArkTS environment |
+
+```ts
+import { registerBrowserEnv, registerNodeEnv } from '@visactor/vchart';
+
+// In a browser application:
+VChart.useRegisters([registerBrowserEnv]);
+
+// In a Node.js SSR / export script:
+VChart.useRegisters([registerNodeEnv]);
+```
+
+<Warning>
+The default `VChart` constructor auto-registers `registerBrowserEnv` in browser environments and `registerNodeEnv` in Node.js. You only need these explicitly when using the tree-shakeable `VChart` core import (`@visactor/vchart/esm/core`) or when targeting mini-program runtimes.
+</Warning>
+
+</Accordion>
+
+---
+
+## Minimal Bundle Example
+
+The following bundle is sufficient for a simple bar chart with a legend and tooltip in a browser — no map, no player, no brush, no markers:
+
+```ts
+import { VChart } from '@visactor/vchart/esm/core';
+import { registerBarChart } from '@visactor/vchart/esm/chart/bar';
+import {
+  registerCartesianBandAxis,
+  registerCartesianLinearAxis
+} from '@visactor/vchart/esm/component/axis/cartesian';
+import { registerDiscreteLegend } from '@visactor/vchart/esm/component/legend';
+import { registerTooltip } from '@visactor/vchart/esm/component/tooltip';
+import { registerDomTooltipHandler } from '@visactor/vchart/esm/plugin/components/tooltip-handler';
+import { registerCartesianCrossHair } from '@visactor/vchart/esm/component/crosshair';
+import { registerLabel } from '@visactor/vchart/esm/component/label';
+import { registerAnimate } from '@visactor/vchart/esm/plugin/other';
+import { registerBrowserEnv } from '@visactor/vchart/esm/env';
+
+VChart.useRegisters([
+  // chart
+  registerBarChart,
+  // axes
+  registerCartesianBandAxis,
+  registerCartesianLinearAxis,
+  // components
+  registerDiscreteLegend,
+  registerTooltip,
+  registerDomTooltipHandler,
+  registerCartesianCrossHair,
+  registerLabel,
+  // animation + env
+  registerAnimate,
+  registerBrowserEnv
+]);
+
+const spec = {
+  type: 'bar',
+  data: [
+    {
+      id: 'sales',
+      values: [
+        { product: 'Widget A', revenue: 420 },
+        { product: 'Widget B', revenue: 310 },
+        { product: 'Widget C', revenue: 580 },
+        { product: 'Widget D', revenue: 245 }
+      ]
+    }
+  ],
+  xField: 'product',
+  yField: 'revenue',
+  title: { text: 'Revenue by Product' },
+  legends: { visible: true }
+};
+
+const vchart = new VChart(spec, { dom: 'container' });
+vchart.renderAsync();
+```
+
+<CardGroup cols={2}>
+  <Card title="Full Bundle" icon="box-archive">
+    Import `VChart` as the default export from `@visactor/vchart`. All registers are called at module load. Best for rapid development.
+  </Card>
+  <Card title="Tree-Shaken Bundle" icon="scissors">
+    Import `VChart` from `@visactor/vchart/esm/core` and call `useRegisters` manually. Reduces bundle by removing unused chart types and components.
+  </Card>
+</CardGroup>

@@ -1,0 +1,387 @@
+---
+title: "Tooltip Spec Configuration and Customization in VChart"
+sidebarTitle: "Tooltip Spec"
+description: "Full reference for VChart's tooltip spec: visible, activeType, trigger, renderMode, confine, content, title, handler, and custom rendering callbacks."
+---
+
+VChart's tooltip system provides rich, interactive data display when users hover over or click on chart elements. The tooltip is configured through the top-level `tooltip` field in your chart spec, corresponding to the `ITooltipSpec` interface in `src/component/tooltip/interface/spec.ts`. VChart supports three tooltip active types — **mark**, **dimension**, and **group** — each with independently customizable `title` and `content`. The tooltip can render as an HTML overlay (default, supports rich styling and interaction) or as a canvas element (better for canvas-only environments).
+
+## Full Example
+
+```json
+{
+  "tooltip": {
+    "visible": true,
+    "trigger": "hover",
+    "activeType": ["mark", "dimension"],
+    "renderMode": "html",
+    "confine": true,
+    "transitionDuration": 150,
+    "offset": { "x": 12, "y": 0 },
+    "mark": {
+      "title": {
+        "value": "Details",
+        "style": { "fontWeight": "bold" }
+      },
+      "content": [
+        {
+          "key": "Month",
+          "value": "(datum) => datum.month"
+        },
+        {
+          "key": "Revenue",
+          "value": "(datum) => `$${datum.revenue}`",
+          "shapeType": "square"
+        }
+      ]
+    },
+    "dimension": {
+      "title": {
+        "value": "(data) => data[0]?.datum?.month"
+      },
+      "content": [
+        {
+          "key": "(datum) => datum.seriesName",
+          "value": "(datum) => datum.value"
+        }
+      ]
+    }
+  }
+}
+```
+
+## Core Visibility & Trigger
+
+<ParamField path="visible" type="boolean" default="true">
+  Master switch for the entire tooltip system. When `false`, no tooltip will
+  show regardless of user interaction. This also suppresses custom `handler`
+  invocations.
+</ParamField>
+
+<ParamField path="activeType" type="'mark' | 'dimension' | 'group' | Array">
+  The tooltip types that are active. Accepts a single value or an array:
+  - `"mark"` — shows tooltip when hovering a specific data mark (bar, point, arc, etc.)
+  - `"dimension"` — shows a tooltip for all data values at the same dimension (e.g., same X value across multiple series)
+  - `"group"` — shows a tooltip for a group of related marks
+
+  ```json
+  { "activeType": ["mark", "dimension"] }
+  ```
+</ParamField>
+
+<ParamField path="trigger" type="'hover' | 'click' | 'none' | Array | object">
+  The event(s) that show the tooltip. Accepts:
+  - `"hover"` — default; shows on mouse move
+  - `"click"` — shows on click
+  - `"none"` — disables all automatic triggers (use with `handler`)
+  - An array combining `"hover"` and `"click"`
+  - A custom event object `{ eventType, source?, consume? }` (since v1.12.10)
+
+  ```json
+  { "trigger": ["hover", "click"] }
+  ```
+</ParamField>
+
+<ParamField path="triggerOff" type="'hover' | 'click' | 'none' | Array | object">
+  The event(s) that hide the tooltip. Must match or extend the `trigger` type.
+  Set to `"none"` to create a persistent (sticky) tooltip. Since v1.12.10
+  supports custom event objects with `checkOutside` to hide when clicking
+  outside the tooltip.
+</ParamField>
+
+<ParamField path="lockAfterClick" type="boolean" default="false">
+  When `true`, the tooltip locks its position after a click and can only be
+  updated or dismissed with another click. Intended for `trigger: ["hover", "click"]`
+  patterns. Since v1.10.0.
+</ParamField>
+
+## Rendering
+
+<ParamField path="renderMode" type="'html' | 'canvas'" default="'html'">
+  How the tooltip is rendered:
+  - `"html"` — creates a DOM overlay element with CSS styling. Supports `enterable`, `parentElement`, and `className`. Default in browser environments.
+  - `"canvas"` — draws the tooltip on the canvas. Automatically enables `confine`. Better for environments without a DOM (mini-programs, node.js screenshots).
+</ParamField>
+
+<ParamField path="confine" type="boolean">
+  When `true`, constrains the tooltip to stay within the canvas boundary. Always
+  `true` when `renderMode` is `"canvas"`. Default `false` for HTML mode.
+</ParamField>
+
+<ParamField path="className" type="string">
+  A CSS class name added to the tooltip DOM element. Only applies when
+  `renderMode: "html"`. Useful for custom CSS overrides.
+</ParamField>
+
+<ParamField path="parentElement" type="string | HTMLElement | HTMLCanvasElement">
+  The DOM element (or its `id`) into which the tooltip HTML element is mounted.
+  Defaults to the chart container. Useful for portal-style tooltip placement.
+</ParamField>
+
+<ParamField path="enterable" type="boolean" default="false">
+  When `true`, the mouse pointer can move into the tooltip DOM element without
+  it disappearing. Enables tooltips with interactive content (links, buttons).
+  Only applies to `renderMode: "html"`.
+</ParamField>
+
+<ParamField path="style" type="ITooltipTheme (partial)">
+  Shared visual style for all tooltip types (mark, dimension, group). Controls
+  the panel background, border, padding, font, and shape colors.
+
+  ```json
+  {
+    "style": {
+      "panel": {
+        "padding": { "top": 8, "right": 12, "bottom": 8, "left": 12 },
+        "backgroundColor": "#fff",
+        "border": { "color": "#e8e8e8", "width": 1, "radius": 4 },
+        "shadow": { "x": 2, "y": 2, "blur": 8, "color": "rgba(0,0,0,0.1)" }
+      },
+      "titleLabel": { "fontSize": 13, "fontWeight": "bold", "fill": "#1a1a1a" },
+      "keyLabel": { "fontSize": 12, "fill": "#666" },
+      "valueLabel": { "fontSize": 12, "fill": "#333" }
+    }
+  }
+  ```
+</ParamField>
+
+## Timing & Animation
+
+<ParamField path="transitionDuration" type="number" default="150">
+  The CSS transition duration in milliseconds for the tooltip DOM position. Set
+  to `0` to make the tooltip track the cursor with no delay. Only affects HTML
+  tooltips.
+</ParamField>
+
+<ParamField path="showDelay" type="number">
+  Delay in milliseconds before showing the tooltip after the trigger event.
+  Useful when `enterable: true` to give the user time to move into the tooltip.
+  Only effective for `hover` trigger. Since v1.12.8.
+</ParamField>
+
+<ParamField path="hideTimer" type="number">
+  A delay in milliseconds before hiding the tooltip after the trigger-off event.
+  Since v1.11.7.
+</ParamField>
+
+<ParamField path="throttleInterval" type="number">
+  Debounce interval in milliseconds for tooltip update events. Higher values
+  reduce tooltip update frequency during fast mouse movements.
+</ParamField>
+
+<ParamField path="offset" type="{ x?: number; y?: number }">
+  Pixel offset applied to the computed tooltip position relative to the cursor
+  or mark.
+
+  ```json
+  { "offset": { "x": 10, "y": -5 } }
+  ```
+</ParamField>
+
+## Content Patterns (`mark`, `dimension`, `group`)
+
+Each active type can have independently configured `title` and `content`.
+
+<ParamField path="mark" type="ITooltipPattern">
+  Content pattern for **mark tooltips** — displayed when hovering a single data
+  element. The `checkOverlap` sub-field (mark only) controls whether overlapping
+  marks at the same position all show their data.
+
+  ```json
+  {
+    "mark": {
+      "visible": true,
+      "title": { "value": "(datum) => datum.category" },
+      "content": [
+        { "key": "Value", "value": "(datum) => datum.amount", "shapeType": "circle" }
+      ]
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="dimension" type="ITooltipPattern">
+  Content pattern for **dimension tooltips** — shows all series values at the
+  same X (or angle/radius) position. Commonly the default tooltip for line and
+  bar charts.
+
+  ```json
+  {
+    "dimension": {
+      "title": { "value": "(data) => data[0]?.datum?.date" },
+      "content": [
+        {
+          "key": "(datum) => datum.seriesName",
+          "value": "(datum) => datum.value",
+          "hasShape": true
+        }
+      ]
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="group" type="IGroupTooltipPattern">
+  Content pattern for **group tooltips**. Extends `ITooltipPattern` with
+  `triggerMark` to specify which mark type triggers the group display (e.g.,
+  `"line"`, `"area"`, `"bar"`). Since v1.11.0.
+</ParamField>
+
+### Tooltip Pattern Fields (`ITooltipPattern`)
+
+<ParamField path="title" type="ITooltipLinePattern | function">
+  The tooltip header line. Accepts a pattern object with `value` (the text
+  content, supports a callback), `valueStyle`, and optionally `hasShape`.
+
+  ```json
+  {
+    "title": {
+      "value": "(datum) => `${datum.category} Details`",
+      "valueStyle": { "fontWeight": "bold" }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="content" type="ITooltipLinePattern[] | function">
+  An array of data row definitions for the tooltip body. Each item can specify:
+  - `key` — the label (string or callback)
+  - `value` — the value (string or callback)
+  - `shapeType` — the shape icon type (`"circle"`, `"square"`, `"triangle"`, etc.)
+  - `shapeColor` / `shapeFill` / `shapeStroke` — icon color overrides
+  - `hasShape` — whether to show the series color icon
+  - `visible` — hide/show this row conditionally
+
+  ```json
+  {
+    "content": [
+      {
+        "key": "Sales",
+        "value": "(datum) => `$${datum.sales.toLocaleString()}` ",
+        "hasShape": true,
+        "shapeType": "square"
+      },
+      {
+        "key": "Target",
+        "value": "(datum) => `$${datum.target.toLocaleString()}`",
+        "shapeColor": "#aaa"
+      }
+    ]
+  }
+  ```
+</ParamField>
+
+<ParamField path="position" type="TooltipPosition | function">
+  Overrides the tooltip position for this active type. Accepts predefined
+  positions (`"top"`, `"bottom"`, `"left"`, `"right"`, `"tl"`, `"tr"`,
+  `"bl"`, `"br"`, `"inside"`) or a callback returning a coordinate object.
+</ParamField>
+
+<ParamField path="updateTitle" type="TooltipUpdateCallback">
+  A callback that receives the computed title line and returns a modified version.
+  Lets you post-process the title without rebuilding the full `title` pattern.
+</ParamField>
+
+<ParamField path="updateContent" type="TooltipUpdateCallback">
+  A callback that receives the computed content rows array and returns a modified
+  version. Useful for reordering, filtering, or appending rows dynamically.
+
+  ```json
+  {
+    "dimension": {
+      "updateContent": "(prev, data, params) => prev.sort((a, b) => b.value - a.value)"
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="maxLineCount" type="number" default="20">
+  Caps the number of content rows rendered. When the data exceeds this count,
+  remaining rows are summarized using the `othersLine` pattern.
+</ParamField>
+
+<ParamField path="othersLine" type="ITooltipLineActual">
+  The "others" summary row shown when content rows exceed `maxLineCount`.
+</ParamField>
+
+## Custom Handler
+
+For fully custom tooltip rendering, implement the `handler` interface:
+
+<ParamField path="handler" type="ITooltipHandlerSpec (partial)">
+  An object with three methods that completely override VChart's built-in tooltip
+  rendering. All three are optional — only implement what you need.
+
+  ```typescript
+  {
+    handler: {
+      showTooltip: (activeType, tooltipData, params) => {
+        // render your custom tooltip
+        // return TooltipResult to signal success/failure
+        return 'not-empty';
+      },
+      hideTooltip: (params) => {
+        // hide your custom tooltip
+      },
+      release: () => {
+        // clean up resources
+      }
+    }
+  }
+  ```
+
+  The `ITooltipHandlerSpec` interface:
+  - `showTooltip(activeType, tooltipData, params)` — called to display a tooltip. Return `"not-empty"` on success.
+  - `hideTooltip(params)` — called to hide the tooltip.
+  - `release()` — called when the chart is destroyed; release DOM elements and listeners.
+  - `isTooltipShown?()` — optional; queried before showing to avoid re-renders.
+</ParamField>
+
+<ParamField path="updateElement" type="function">
+  A lighter alternative to `handler.showTooltip` that lets you modify the
+  existing HTML tooltip DOM element. Receives `(tooltipElement, actualTooltip,
+  params)`. Only applies when `renderMode: "html"`. Since v1.6.0.
+
+  ```typescript
+  {
+    updateElement: (el, actualTooltip, params) => {
+      el.style.border = '2px solid red';
+      el.querySelector('.tooltip-title').textContent = 'Custom Title';
+    }
+  }
+  ```
+</ParamField>
+
+## Per-series Tooltip Override
+
+Individual series can override the global tooltip via `series.tooltip`:
+
+```json
+{
+  "series": [
+    {
+      "type": "line",
+      "tooltip": {
+        "visible": true,
+        "mark": {
+          "content": [
+            { "key": "Trend", "value": "(datum) => datum.value" }
+          ]
+        }
+      }
+    }
+  ]
+}
+```
+
+<Note>
+  Series-level `tooltip.visible: false` can hide the tooltip for that series
+  only, but a series cannot re-enable a tooltip that was globally disabled via
+  the chart-level `tooltip.visible: false`.
+</Note>
+
+<Tip>
+  Use `activeType: "dimension"` as the default for bar and line charts — it
+  shows all series values at the hovered X position, which is more useful than
+  `"mark"` when comparing multiple series.
+</Tip>

@@ -1,0 +1,398 @@
+---
+title: "Axis Spec Configuration for VChart Cartesian Charts"
+sidebarTitle: "Axis Spec"
+description: "Complete reference for VChart's axes array spec: orient, type, label, grid, tick, domainLine, min/max, nice, zero, and tick count options."
+---
+
+VChart axes are configured through the top-level `axes` array in your chart spec. Each element in that array describes one axis: its position (`orient`), scale type (`type`), visual elements (labels, ticks, grid lines, the domain line), and data range settings. VChart supports Cartesian axes (`left`, `right`, `top`, `bottom`) and Polar axes (`angle`, `radius`). The interface hierarchy starts at `ICommonAxisSpec` and is extended by `ICartesianAxisCommonSpec` and the type-specific specs (`ICartesianLinearAxisSpec`, `ICartesianBandAxisSpec`, `ICartesianTimeAxisSpec`, etc.).
+
+## Multi-axis Example
+
+The following spec places a bar series on the left Y-axis and a line series on a secondary right Y-axis, a common dual-axis pattern:
+
+```json
+{
+  "type": "common",
+  "series": [
+    {
+      "type": "bar",
+      "dataIndex": 0,
+      "xField": "month",
+      "yField": "revenue",
+      "yAxisIndex": 0
+    },
+    {
+      "type": "line",
+      "dataIndex": 0,
+      "xField": "month",
+      "yField": "growthRate",
+      "yAxisIndex": 1
+    }
+  ],
+  "data": [{
+    "values": [
+      { "month": "Jan", "revenue": 400, "growthRate": 0.12 },
+      { "month": "Feb", "revenue": 520, "growthRate": 0.30 },
+      { "month": "Mar", "revenue": 480, "growthRate": -0.08 }
+    ]
+  }],
+  "axes": [
+    {
+      "orient": "bottom",
+      "type": "band",
+      "label": { "visible": true }
+    },
+    {
+      "orient": "left",
+      "type": "linear",
+      "id": "leftAxis",
+      "title": { "visible": true, "text": "Revenue (USD)" },
+      "zero": true,
+      "nice": true
+    },
+    {
+      "orient": "right",
+      "type": "linear",
+      "id": "rightAxis",
+      "title": { "visible": true, "text": "Growth Rate" },
+      "zero": false,
+      "nice": true,
+      "grid": { "visible": false }
+    }
+  ]
+}
+```
+
+## Common Axis Fields (`ICommonAxisSpec`)
+
+These fields apply to all axis types and orientations.
+
+<ParamField path="orient" type="'left' | 'right' | 'top' | 'bottom' | 'radius' | 'angle' | 'z'" required>
+  The position of the axis relative to the chart region. Cartesian axes use
+  `left`, `right`, `top`, or `bottom`. Polar charts use `radius` and `angle`.
+  The `z` orient is used for 3-D charts.
+</ParamField>
+
+<ParamField path="type" type="'linear' | 'band' | 'point' | 'ordinal' | 'time' | 'log' | 'symlog'">
+  The scale type for this axis. VChart infers a sensible default based on field
+  data types, but you should set it explicitly for predictable behavior:
+
+  - `"linear"` — continuous numeric scale (Y axes typically)
+  - `"band"` — discrete bands with padding (X axis for bar charts)
+  - `"point"` — discrete point positions (X axis for line/scatter)
+  - `"time"` — continuous time scale with automatic layer formatting
+  - `"log"` — logarithmic scale; configure `base` to change the base (default 10)
+  - `"symlog"` — symmetric log scale; configure `constant` (default 10)
+</ParamField>
+
+<ParamField path="visible" type="boolean" default="true">
+  Whether to render this axis. Setting `visible: false` hides all axis
+  elements (line, ticks, labels, grid) but the axis still participates in
+  layout unless `grid.visible` is also disabled.
+</ParamField>
+
+<ParamField path="inverse" type="boolean" default="false">
+  Reverses the direction of the axis. For a left-orient linear axis, values
+  increase downward instead of upward.
+</ParamField>
+
+<ParamField path="id" type="string | number">
+  An optional identifier. Series reference axes using `xAxisId` / `yAxisId`,
+  and the `sync` feature references axes by `id`.
+</ParamField>
+
+<ParamField path="animation" type="boolean" default="false">
+  Enables axis enter/update animations. Disabled by default for performance.
+</ParamField>
+
+<ParamField path="sampling" type="boolean" default="true">
+  When `true`, VChart samples the axis labels to avoid overlap. The sampling
+  threshold is controlled by `label.minGap`. Set to `false` to force all labels
+  to render.
+</ParamField>
+
+## Cartesian-specific Fields (`ICartesianAxisCommonSpec`)
+
+<ParamField path="grid" type="IGrid">
+  Grid line configuration drawn perpendicular to the axis across the plot area.
+
+  ```json
+  {
+    "grid": {
+      "visible": true,
+      "style": { "stroke": "#e0e0e0", "lineWidth": 1, "lineDash": [4, 4] },
+      "alternateColor": ["rgba(0,0,0,0.03)", "transparent"]
+    }
+  }
+  ```
+
+  Key sub-fields:
+  - `visible` — show/hide grid lines
+  - `style` — `IRuleMarkSpec` stroke style or callback
+  - `alternateColor` — alternating fill color between grid bands
+  - `alignWithLabel` — align grid lines with labels (default `true`)
+  - `zIndex` — render order (default `50`)
+</ParamField>
+
+<ParamField path="subGrid" type="IGrid">
+  Sub-grid lines rendered between major grid lines. Same structure as `grid`.
+  Useful with log or time axes where minor intervals are meaningful.
+</ParamField>
+
+<ParamField path="domainLine" type="ICartesianDomainLine">
+  The axis baseline (the line drawn along the axis orientation).
+
+  ```json
+  {
+    "domainLine": {
+      "visible": true,
+      "style": { "stroke": "#999", "lineWidth": 1 }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="label" type="ICartesianLabel">
+  Axis tick label configuration.
+
+  ```json
+  {
+    "label": {
+      "visible": true,
+      "space": 4,
+      "inside": false,
+      "minGap": 10,
+      "style": { "fontSize": 12, "fill": "#666" },
+      "formatMethod": "(val) => `${val}k`",
+      "formatter": "{value:.1f}%",
+      "angle": -45,
+      "flush": true,
+      "lastVisible": true
+    }
+  }
+  ```
+
+  Key sub-fields:
+  - `visible` — show/hide labels
+  - `space` — gap between the tick line and the label text (px)
+  - `inside` — if `true`, labels render inside the plot area
+  - `minGap` — minimum px gap between adjacent labels (used in sampling)
+  - `formatMethod` — function `(text, datum) => string | object`
+  - `formatter` — template string, e.g. `"{value:.2f}"`
+  - `style` — `ITextMarkSpec` or style callback
+  - `dataFilter` — callback to filter which ticks get labels
+</ParamField>
+
+<ParamField path="title" type="ICartesianTitle">
+  The axis title label rendered alongside the axis line.
+
+  ```json
+  {
+    "title": {
+      "visible": true,
+      "text": "Sales (USD)",
+      "position": "middle",
+      "space": 12,
+      "style": { "fontSize": 13, "fill": "#333", "fontWeight": "bold" }
+    }
+  }
+  ```
+
+  Key sub-fields:
+  - `text` — title string, array, or rich-text config
+  - `position` — `"start"` | `"middle"` | `"end"`
+  - `space` — distance from the axis bounding box to the title
+  - `angle` — rotation angle for the whole title group
+  - `padding` — internal padding around the title text
+</ParamField>
+
+<ParamField path="autoIndent" type="boolean">
+  When `true`, VChart adds extra chart padding when axis elements overflow the
+  canvas boundary, ensuring labels are never clipped.
+</ParamField>
+
+<ParamField path="unit" type="ICartesianAxisUnit">
+  A unit label displayed at the end of the axis (e.g. `"USD"`, `"kg"`). This is
+  separate from the axis title and is positioned near the last tick mark.
+</ParamField>
+
+## Linear Axis Fields (`ILinearAxisSpec`)
+
+These fields apply when `type` is `"linear"`, `"log"`, or `"symlog"`.
+
+<ParamField path="min" type="number">
+  Hard minimum for the axis domain. **Higher priority than `zero` and `nice`.**
+  The axis will always start at or below this value.
+</ParamField>
+
+<ParamField path="max" type="number">
+  Hard maximum for the axis domain. **Higher priority than `zero` and `nice`.**
+  The axis will always end at or above this value.
+</ParamField>
+
+<ParamField path="softMin" type="number | function">
+  Soft minimum — only takes effect when the data minimum is greater than this
+  value. Unlike `min`, it does not override data-driven ranges. Available since
+  v1.11.0.
+</ParamField>
+
+<ParamField path="softMax" type="number | function">
+  Soft maximum — only takes effect when the data maximum is less than this
+  value. Available since v1.11.0.
+</ParamField>
+
+<ParamField path="zero" type="boolean" default="true">
+  When `true`, the axis domain always includes zero, preventing the axis from
+  starting at a non-zero value even when all data values are positive.
+  Ignored when `min`/`max` are explicitly set.
+</ParamField>
+
+<ParamField path="nice" type="boolean" default="true">
+  Rounds the computed domain to "nice" round numbers (e.g. 0–100 instead of
+  0–97.3). Ignored when `min`/`max` are set.
+</ParamField>
+
+<ParamField path="niceType" type="'tickCountFirst' | 'accurateFirst'" default="'tickCountFirst'">
+  Controls the nice algorithm trade-off. `"tickCountFirst"` prioritizes
+  honoring `tickCount` even at the cost of a wider range. `"accurateFirst"`
+  keeps the range tight but may produce fewer ticks.
+</ParamField>
+
+<ParamField path="expand" type="{ min?: number; max?: number }">
+  Proportionally expands the domain beyond the data range. Values are fractions
+  of the total range (e.g. `{ min: 0.1 }` adds 10% padding at the bottom).
+</ParamField>
+
+<ParamField path="breaks" type="ILinearAxisBreakSpec[]">
+  Axis break configuration for omitting large gaps in continuous data. Each
+  break has a `scope` (data value range to cut) and a `gap` (px or % space to
+  use instead). Cartesian linear axes only. Available since v1.12.4.
+</ParamField>
+
+## Band Axis Fields (`IBandAxisSpec`)
+
+These fields apply when `type` is `"band"` or `"point"`.
+
+<ParamField path="bandPadding" type="number | number[]" default="0.1">
+  Sets both `paddingInner` and `paddingOuter` simultaneously. Accepts an array
+  for multi-layer (grouped) scales.
+</ParamField>
+
+<ParamField path="paddingInner" type="number | number[]" default="0.1">
+  The fractional gap between bands (0 = no gap, 1 = bands are all gap). Accepts
+  an array for multi-layer grouped axes.
+</ParamField>
+
+<ParamField path="paddingOuter" type="number | number[]" default="0.3">
+  The fractional padding before the first and after the last band.
+</ParamField>
+
+<ParamField path="bandPosition" type="number" default="0.5">
+  The fractional position of the data point within its band. `0` = left edge,
+  `0.5` = center, `1` = right edge.
+</ParamField>
+
+<ParamField path="domain" type="(string | number)[]">
+  Explicitly sets the list of discrete values on this axis, overriding
+  data-driven domain computation. Available since v1.1.0.
+</ParamField>
+
+<ParamField path="trimPadding" type="boolean" default="false">
+  When `true`, removes all outer padding, making bands touch the axis ends.
+  Overrides `bandPadding`, `paddingInner`, and `paddingOuter`. Since v1.7.0.
+</ParamField>
+
+## Tick Configuration (`ITick`)
+
+<ParamField path="tick" type="ITick">
+  Controls the tick marks drawn at each label position.
+
+  ```json
+  {
+    "tick": {
+      "visible": true,
+      "tickSize": 4,
+      "inside": false,
+      "alignWithLabel": true,
+      "style": { "stroke": "#aaa", "lineWidth": 1 }
+    }
+  }
+  ```
+
+  Sub-fields:
+  - `tickSize` — tick line length in pixels (default `4`)
+  - `inside` — draw ticks inside the plot area
+  - `alignWithLabel` — align ticks with labels rather than between them
+  - `tickStep` — fixed step size between ticks for linear axes
+  - `tickCount` — suggested number of ticks (number or callback)
+  - `forceTickCount` — exact tick count (may produce decimal values)
+  - `tickMode` — algorithm: `"average"` | `"d3"` | custom function
+  - `noDecimals` — avoid fractional tick values
+  - `dataFilter` — callback `(data, context) => AxisItem[]`
+</ParamField>
+
+<ParamField path="subTick" type="ISubTick">
+  Minor tick marks rendered between major ticks.
+
+  ```json
+  {
+    "subTick": {
+      "visible": true,
+      "tickCount": 4,
+      "tickSize": 2
+    }
+  }
+  ```
+</ParamField>
+
+## Axis Types Quick Reference
+
+<CardGroup cols={2}>
+  <Card title="Linear Axis" icon="chart-line">
+    Use for continuous numeric data. Supports `min`, `max`, `zero`, `nice`,
+    `tickCount`, `tickStep`, `breaks`, and logarithmic variants.
+  </Card>
+  <Card title="Band Axis" icon="chart-bar">
+    Use for categorical data in bar charts. Supports `paddingInner`,
+    `paddingOuter`, `bandSize`, and multi-layer group configurations.
+  </Card>
+  <Card title="Time Axis" icon="clock">
+    Use for date/time data. Automatically formats labels by time granularity
+    and supports multi-layer display (e.g., day + month).
+  </Card>
+  <Card title="Log / Symlog Axis" icon="arrow-trend-up">
+    Use for exponential data ranges. `log` uses a configurable `base` (default
+    10); `symlog` supports negative values with a `constant` parameter.
+  </Card>
+</CardGroup>
+
+<Note>
+  For polar charts, use `orient: "angle"` and `orient: "radius"` in the same
+  `axes` array. The polar axis spec shares the common fields but omits Cartesian
+  positioning options like `innerOffset`.
+</Note>
+
+## Axis Sync (Dual-axis Alignment)
+
+```json
+{
+  "axes": [
+    { "orient": "left", "id": "yLeft", "type": "linear" },
+    {
+      "orient": "right",
+      "type": "linear",
+      "sync": {
+        "axisId": "yLeft",
+        "zeroAlign": true,
+        "tickAlign": true
+      }
+    }
+  ]
+}
+```
+
+<ParamField path="sync" type="ILinearAxisSync">
+  Synchronizes this axis with another axis by `axisId`. When `zeroAlign: true`,
+  both axes share the same zero position. When `tickAlign: true`, tick marks are
+  proportionally aligned between the two axes.
+</ParamField>

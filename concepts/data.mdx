@@ -1,0 +1,306 @@
+---
+title: "Data Model and Data Binding in VChart"
+sidebarTitle: "Data"
+description: "Understand VChart's IDataValues format, DataView binding, field mapping, transform pipeline, and live data updates with updateData()."
+---
+
+VChart separates the concern of *data shape* from *visual encoding*. All data flows through a pipeline built on top of the **vdataset** library: raw values enter, optional transforms are applied, and the resulting rows are bound to series marks through field-name mappings. Understanding this pipeline lets you load any shape of data — inline arrays, CSV strings, or live DataViews — and wire it to any chart type without reshaping your source records manually.
+
+## The `IDataValues` Structure
+
+The simplest way to supply data is the `IDataValues` interface. It pairs a unique `id` with an array of plain row objects (or a raw string like CSV):
+
+```typescript
+// packages/vchart/src/typings/spec/common.ts
+export interface IDataValues {
+  /** Unique identifier — use it to reference this dataset from series or updateData() */
+  id?: StringOrNumber;
+  /** Row array or a raw CSV/DSV/TSV string */
+  values: Datum[] | string;
+  /** Reference another registered dataset by array index */
+  fromDataIndex?: number;
+  /** Reference another registered dataset by id */
+  fromDataId?: StringOrNumber;
+  /** vdataset transforms to apply in order */
+  transforms?: BuildInTransformOptions[];
+  /** Per-field metadata: alias, domain, sort, type */
+  fields?: Record<string, IFieldsMeta>;
+  /** Parser config for string values (csv, dsv, tsv) */
+  parser?: SheetParseOptions | CommonParseOptions;
+}
+```
+
+A chart can hold multiple datasets in its `data` array. Each series then references whichever dataset it needs by `dataIndex` (positional) or `dataId` (by name):
+
+```javascript
+const spec = {
+  type: 'common',
+  data: [
+    { id: 'revenue', values: [{ month: 'Jan', value: 120 }, { month: 'Feb', value: 200 }] },
+    { id: 'costs',   values: [{ month: 'Jan', value: 80  }, { month: 'Feb', value: 95  }] }
+  ],
+  series: [
+    { type: 'bar',  dataId: 'revenue', xField: 'month', yField: 'value' },
+    { type: 'line', dataId: 'costs',   xField: 'month', yField: 'value' }
+  ]
+};
+```
+
+## Inline Array Data
+
+The most straightforward form is an array of plain objects directly inside the spec:
+
+```javascript
+const spec = {
+  type: 'bar',
+  data: {
+    id: 'sales',
+    values: [
+      { product: 'Apples',  units: 340 },
+      { product: 'Oranges', units: 210 },
+      { product: 'Bananas', units: 290 }
+    ]
+  },
+  xField: 'product',
+  yField: 'units'
+};
+```
+
+VChart internally wraps this plain array in a vdataset `DataView`, making it eligible for transforms and reactivity.
+
+## Using a vdataset `DataView`
+
+When you already have a `DataView` instance — from your own vdataset pipeline — pass it directly in place of an `IDataValues` object. This is useful when multiple charts share a single data source and should update in concert:
+
+```javascript
+import { DataSet, DataView } from '@visactor/vdataset';
+
+const dataSet = new DataSet();
+const dv = new DataView(dataSet, { name: 'sharedSales' });
+dv.parse([
+  { region: 'North', q1: 120, q2: 140 },
+  { region: 'South', q1: 90,  q2: 110 }
+], { type: 'array' });
+
+const spec = {
+  type: 'bar',
+  data: dv,   // pass the DataView directly
+  xField: 'region',
+  yField: 'q1'
+};
+```
+
+## Parsing String Data (CSV / DSV / TSV)
+
+Set `values` to a raw string and add a `parser` config to let vdataset handle the parsing:
+
+```javascript
+const spec = {
+  type: 'line',
+  data: {
+    id: 'csvData',
+    values: 'month,sales\nJan,120\nFeb,200\nMar,150',
+    parser: { type: 'csv' }
+  },
+  xField: 'month',
+  yField: 'sales'
+};
+```
+
+For TSV or custom delimiters, use `type: 'tsv'` or `type: 'dsv'` with an `options.delimiter` field.
+
+## The `fields` Config — Field Metadata
+
+The optional `fields` map lets you attach metadata to individual data fields without transforming the underlying values. This controls how VChart's statistical engine interprets each field:
+
+```typescript
+export interface IFieldsMeta {
+  /** Human-readable alias shown in tooltips and legends */
+  alias?: string;
+  /** Explicit value domain — useful to fix axis ranges */
+  domain?: StringOrNumber[];
+  /** Lock the domain so legend interactions do not affect it */
+  lockStatisticsByDomain?: boolean | 'onlyFull';
+  /** 'ordinal' for categorical, 'linear' for continuous */
+  type?: 'ordinal' | 'linear';
+  /** Sort priority index (lower = sorted first) */
+  sortIndex?: number;
+  /** Reverse the sort direction */
+  sortReverse?: boolean;
+  /** Shorthand: 'asc' or 'desc' */
+  sort?: 'desc' | 'asc';
+}
+```
+
+Example — sort months chronologically and give the value field a display alias:
+
+```javascript
+data: {
+  id: 'monthly',
+  values: [ /* ... */ ],
+  fields: {
+    month: {
+      type: 'ordinal',
+      domain: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+               'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+      lockStatisticsByDomain: true
+    },
+    revenue: {
+      alias: 'Total Revenue ($)',
+      type: 'linear'
+    }
+  }
+}
+```
+
+## Built-in Transforms
+
+The `transforms` array runs a sequential pipeline over the data. Each entry names a built-in transform and supplies its options:
+
+<Tabs>
+  <Tab title="fields">
+    Filter and sort dimensions using `fields` transform:
+
+    ```javascript
+    transforms: [
+      {
+        type: 'fields',
+        options: {
+          fields: {
+            category: { sortIndex: 0 }
+          }
+        }
+      }
+    ]
+    ```
+  </Tab>
+  <Tab title="filter">
+    Apply a predicate function to remove rows:
+
+    ```javascript
+    transforms: [
+      {
+        type: 'filter',
+        options: {
+          callback: (datum) => datum.value > 0
+        }
+      }
+    ]
+    ```
+  </Tab>
+  <Tab title="fold">
+    Pivot multiple value columns into `key` / `value` rows — essential for grouped charts:
+
+    ```javascript
+    // Before: { region: 'North', q1: 120, q2: 140 }
+    // After:  { region: 'North', key: 'q1', value: 120 }
+    //         { region: 'North', key: 'q2', value: 140 }
+    transforms: [
+      {
+        type: 'fold',
+        options: {
+          fields: ['q1', 'q2'],
+          key: 'key',
+          value: 'value'
+        }
+      }
+    ]
+    ```
+  </Tab>
+  <Tab title="simplify">
+    Reduce geographic coordinate precision for performance:
+
+    ```javascript
+    transforms: [
+      {
+        type: 'simplify',
+        options: { tolerance: 0.01 }
+      }
+    ]
+    ```
+  </Tab>
+</Tabs>
+
+## Live Updates with `updateData()`
+
+When your application receives fresh data — a WebSocket message, a polling response, or a user action — call `updateData()` (async) or `updateDataSync()` (sync) with the data set's `id` and the new rows. VChart re-runs the transform pipeline and re-renders only the affected parts of the scene graph:
+
+<CodeGroup>
+
+```javascript Async update
+// Push new rows to the 'sales' dataset and wait for render
+await chart.updateData('sales', [
+  { product: 'Apples',  units: 400 },
+  { product: 'Oranges', units: 250 },
+  { product: 'Bananas', units: 310 }
+]);
+```
+
+```javascript Sync update
+// Same, but blocks until the render is complete
+chart.updateDataSync('sales', newRows);
+```
+
+```javascript Batch update
+// Update multiple datasets in a single render pass
+await chart.updateDataInBatches([
+  { id: 'revenue', data: revenueRows },
+  { id: 'costs',   data: costRows }
+]);
+```
+
+</CodeGroup>
+
+<Tip>
+`updateData()` only re-renders the series bound to the changed dataset, keeping animation transitions smooth even on large dashboards.
+</Tip>
+
+## Referencing Data Across Series
+
+In a `common` composite chart every series can reference either a shared top-level dataset (`dataIndex` / `dataId`) or carry its own inline data:
+
+```javascript
+series: [
+  {
+    type: 'bar',
+    // use the first top-level dataset (index 0)
+    dataIndex: 0,
+    xField: 'month',
+    yField: 'revenue'
+  },
+  {
+    type: 'line',
+    // use a named dataset
+    dataId: 'forecast',
+    xField: 'month',
+    yField: 'projected'
+  },
+  {
+    type: 'scatter',
+    // series-owned data — completely independent
+    data: { id: 'outliers', values: outlierRows },
+    xField: 'month',
+    yField: 'value'
+  }
+]
+```
+
+<Note>
+When a single-type chart (e.g. `bar`) has only one series, you can place data directly at the chart level in `spec.data` without using the `series` array. The chart automatically binds its implicit series to that dataset.
+</Note>
+
+## `dataKey` — Stable Data–Mark Bindings
+
+The `dataKey` property on a series (or on individual data objects) determines how VChart matches rows to graphical marks across data updates. Stable keys enable smooth update animations — the mark representing row `id: 'apples'` slides to its new position rather than fading out and fading in:
+
+```javascript
+{
+  type: 'bar',
+  data: { id: 'fruit', values: fruitRows },
+  xField: 'product',
+  yField: 'units',
+  dataKey: 'product'   // use the 'product' field as the stable identity
+}
+```
+
+`dataKey` also accepts an array of field names or a `(datum, index) => string` callback for composite keys.

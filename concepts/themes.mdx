@@ -1,0 +1,323 @@
+---
+title: "Theming VChart with Built-in and Custom Themes"
+sidebarTitle: "Themes"
+description: "Learn how to use VChart's built-in light theme, register custom themes with ThemeManager, apply them globally or per-instance, and design your own token system."
+---
+
+VChart's theming system is a structured, composable way to control every visual attribute — colors, typography, component styles, and mark appearances — from a single configuration object. Rather than scattering `fill`, `stroke`, and `fontSize` overrides throughout your spec, you register a named theme once and apply it to all chart instances with a single call. The system is layered: built-in themes provide sensible defaults, custom themes extend those defaults by merging only the properties you want to override, and per-chart `spec.theme` settings take the highest precedence.
+
+## Built-in Themes
+
+VChart ships with a `light` theme registered at startup. It is the default applied to every chart instance unless you configure otherwise:
+
+```typescript
+// packages/vchart/src/theme/builtin/light/index.ts
+export const lightTheme: ITheme = {
+  name: 'light',
+  background: { type: 'palette', key: 'backgroundColor' }, // resolves to '#ffffff'
+  padding: 20,
+  fontFamily: { type: 'token', key: 'fontFamily' },         // resolves from token map
+  colorScheme,        // 10-color and 20-color progressive palettes
+  token,              // font-size, line-height tokens
+  mark: markByType,   // global mark styles by MarkTypeEnum
+  markByName,         // global mark styles by semantic name (bar, point, label…)
+  animationThreshold: 2000
+};
+```
+
+A `dark` theme is also available in the source and can be imported and registered manually if your application requires it.
+
+## `ITheme` Structure
+
+The full theme interface defines seven layers of configuration, from global chart properties down to individual component styles:
+
+```typescript
+// packages/vchart/src/theme/interface.ts
+export interface ITheme {
+  // 1. Identity
+  name?: string;
+  description?: string;
+  type?: 'light' | 'dark'; // determines which built-in theme to merge with
+
+  // 2. Chart-level style
+  background?: IColor | IColorKey;
+  padding?: ILayoutPaddingSpec;
+  fontFamily?: string | ITokenKey;
+
+  // 3. Token map — semantic constants reused throughout the theme
+  token?: TokenMap;
+
+  // 4. Color palette
+  colorScheme?: IThemeColorScheme;
+
+  // 5. Global mark styles (indexed by mark type or semantic name)
+  mark?: IGlobalMarkThemeByType;
+  markByName?: IGlobalMarkThemeByName;
+
+  // 6. Series-level styles
+  series?: ISeriesTheme;
+
+  // 7. Component-level styles
+  component?: IComponentTheme;
+
+  // 8. Per-chart-type overrides
+  chart?: Record<ChartType, Omit<ITheme, 'name' | 'type' | 'description'>>;
+
+  animationThreshold?: number;
+}
+```
+
+## The Color Scheme
+
+The `colorScheme.default.dataScheme` field holds a **progressive color palette** — VChart selects a different subset of colors based on how many data series are present, ensuring optimal contrast at any series count:
+
+```typescript
+// packages/vchart/src/theme/color-scheme/builtin/default.ts
+export const dataScheme = [
+  // Tier 1 — up to 10 series
+  {
+    maxDomainLength: 10,
+    scheme: [
+      '#1664FF', '#1AC6FF', '#FF8A00', '#3CC780',
+      '#7442D4', '#FFC400', '#304D77', '#B48DEB',
+      '#009488', '#FF7DDA'
+    ]
+  },
+  // Tier 2 — more than 10 series (20 colors, paired light/dark variants)
+  {
+    scheme: [
+      '#1664FF', '#B2CFFF', '#1AC6FF', '#94EFFF',
+      '#FF8A00', '#FFCE7A', '#3CC780', '#B9EDCD',
+      // … 12 more
+    ]
+  }
+];
+```
+
+The `palette` sub-object provides semantic color tokens for UI elements (backgrounds, axis lines, labels, danger indicators, etc.) that components reference instead of hard-coded hex values.
+
+## The Token System
+
+Tokens are named constants that can be referenced anywhere in a theme using an `ITokenKey` object:
+
+```typescript
+// packages/vchart/src/theme/token/interface.ts
+export interface ITokenKey<T = any> {
+  type: 'token';
+  key: string;       // key in the TokenMap
+  default?: T;       // fallback if key is missing
+}
+```
+
+The built-in token map defines font sizes and families:
+
+```typescript
+// packages/vchart/src/theme/token/builtin/default.ts
+export const token = {
+  fontFamily: 'PingFang SC,Helvetica Neue,Microsoft Yahei,system-ui,...',
+  fontSize: 14,
+  l1FontSize: 32,  l1LineHeight: '150%',
+  l2FontSize: 20,  l2LineHeight: '140%',
+  l3FontSize: 16,  l3LineHeight: '150%',
+  l4FontSize: 14,  l4LineHeight: '150%',
+  l5FontSize: 12,  l5LineHeight: '130%',
+  l6FontSize: 10,  l6LineHeight: '120%'
+};
+```
+
+When you create a custom theme you can add your own keys to `token` and reference them throughout the theme with `{ type: 'token', key: 'myKey' }`.
+
+## `ThemeManager` — the Global Theme Registry
+
+`VChart.ThemeManager` is a static class that owns the global theme map. All chart instances share the same registry:
+
+```typescript
+// packages/vchart/src/theme/theme-manager.ts (key methods)
+class ThemeManager {
+  static registerTheme(name: string, theme: Partial<ITheme>): void;
+  static getTheme(name: string): ITheme | undefined;
+  static removeTheme(name: string): boolean;
+  static themeExist(name: any): boolean;
+
+  // Apply a theme to every live chart instance simultaneously
+  static setCurrentTheme(name: string): void;
+  static getCurrentTheme(): ITheme;
+  static getCurrentThemeName(): string;
+  static getDefaultTheme(): ITheme;
+}
+```
+
+### Registering a theme
+
+<Steps>
+  <Step title="Define your theme object">
+    Create a partial `ITheme` object. You only need to supply the properties you want to differ from the base theme. VChart deep-merges your partial against the default `light` (or `dark`) theme automatically.
+
+    ```javascript
+    import VChart from '@visactor/vchart';
+
+    const brandTheme = {
+      name: 'brand',
+      type: 'light',         // merge with the built-in light theme as base
+      background: '#f8f9fc',
+      colorScheme: {
+        default: {
+          dataScheme: [
+            {
+              maxDomainLength: 10,
+              scheme: [
+                '#0055FF', '#00AAFF', '#00CCAA',
+                '#FFAA00', '#FF5500', '#CC00AA',
+                '#7722EE', '#22AA44', '#FF3366',
+                '#44DDEE'
+              ]
+            }
+          ],
+          palette: {
+            primaryFontColor: '#1a1c20',
+            axisLabelFontColor: '#6b7280',
+            axisGridColor:      '#e5e7eb'
+          }
+        }
+      },
+      token: {
+        // reuse built-in token keys but with new values
+        fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+        fontSize: 13
+      },
+      component: {
+        tooltip: {
+          panel: {
+            style: {
+              background: '#ffffff',
+              border: { color: '#e5e7eb', width: 1 },
+              shadow: { color: 'rgba(0,0,0,0.08)', blur: 12 }
+            }
+          }
+        }
+      }
+    };
+    ```
+  </Step>
+
+  <Step title="Register the theme">
+    Call `VChart.ThemeManager.registerTheme()` before creating any chart instances:
+
+    ```javascript
+    VChart.ThemeManager.registerTheme('brand', brandTheme);
+    ```
+  </Step>
+
+  <Step title="Apply globally to all instances">
+    Use `setCurrentTheme()` to switch every current and future chart instance to the registered theme:
+
+    ```javascript
+    VChart.ThemeManager.setCurrentTheme('brand');
+    ```
+  </Step>
+</Steps>
+
+## Applying a Theme to a Single Instance
+
+You have three ways to apply a theme to a specific chart without affecting others:
+
+<Tabs>
+  <Tab title="Via IInitOption">
+    Pass the theme name (or a full theme object) in the constructor options:
+
+    ```javascript
+    const chart = new VChart(spec, {
+      dom: 'chart-container',
+      theme: 'brand'          // string key previously registered
+    });
+    chart.renderSync();
+    ```
+  </Tab>
+
+  <Tab title="Via spec.theme">
+    Embed the theme name or a partial theme object directly in the spec. This takes the highest precedence — it overrides both the constructor option and the global `ThemeManager` setting:
+
+    ```javascript
+    const spec = {
+      type: 'bar',
+      theme: 'brand',    // or: theme: { background: '#000', ... }
+      // ...
+    };
+    ```
+  </Tab>
+
+  <Tab title="Via setCurrentTheme()">
+    Switch the theme of a live instance at runtime. This triggers a re-render with the new theme applied:
+
+    ```javascript
+    // Async (waits for re-render to complete)
+    await chart.setCurrentTheme('brand');
+
+    // Sync
+    chart.setCurrentThemeSync('brand');
+    ```
+  </Tab>
+</Tabs>
+
+## Minimal Custom Theme Example
+
+Here is a complete minimal theme that overrides just the essentials — colors, background, and a key component style — while inheriting everything else from the built-in `light` theme:
+
+```javascript
+import VChart from '@visactor/vchart';
+
+VChart.ThemeManager.registerTheme('midnight', {
+  name: 'midnight',
+  type: 'dark',                    // base on dark semantics
+  background: '#0d1117',
+  colorScheme: {
+    default: {
+      dataScheme: [
+        {
+          maxDomainLength: 10,
+          scheme: [
+            '#58A6FF', '#3FB950', '#FF7B72', '#F0883E',
+            '#D2A8FF', '#79C0FF', '#56D364', '#FFA198',
+            '#FFB340', '#BC8CFF'
+          ]
+        }
+      ],
+      palette: {
+        backgroundColor:      '#0d1117',
+        primaryFontColor:     '#e6edf3',
+        secondaryFontColor:   '#8b949e',
+        axisLabelFontColor:   '#8b949e',
+        axisGridColor:        '#21262d',
+        axisDomainColor:      '#30363d'
+      }
+    }
+  },
+  token: {
+    fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+    fontSize: 12
+  }
+});
+
+// Apply to all new chart instances
+VChart.ThemeManager.setCurrentTheme('midnight');
+```
+
+<Note>
+`registerTheme()` always deep-merges your partial theme with the base theme indicated by the `type` field (`'light'` or `'dark'`). You never need to redeclare properties you want to keep from the base.
+</Note>
+
+## Querying Theme State
+
+```javascript
+// Check whether a theme name is registered
+VChart.ThemeManager.themeExist('brand');      // true / false
+
+// Retrieve the full resolved theme object
+const theme = VChart.ThemeManager.getTheme('brand');
+
+// Get the current global theme name
+const name = VChart.ThemeManager.getCurrentThemeName();
+
+// Get the current theme of a specific instance
+const instanceTheme = chart.getCurrentTheme();
+```

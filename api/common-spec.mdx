@@ -1,0 +1,380 @@
+---
+title: "Common Spec Fields Shared by All VChart Charts"
+sidebarTitle: "Common Spec"
+description: "Reference for the top-level IChartSpec fields shared across every VChart chart type: data, layout, axes, legends, tooltip, theming, and more."
+---
+
+Every VChart chart is driven by a plain JavaScript object called the **spec**. Regardless of chart type — bar, line, scatter, pie, or any other — the spec always shares a common set of top-level fields defined by the `IChartSpec` interface in `src/typings/spec/common.ts`. Understanding these fields is the foundation for working with VChart's declarative API. Chart-specific fields (like `xField`, `yField`, or `categoryField`) live alongside these common fields but are documented per chart type.
+
+## Full Example
+
+```json
+{
+  "type": "bar",
+  "width": 600,
+  "height": 400,
+  "autoFit": true,
+  "background": "#f5f5f5",
+  "padding": { "top": 20, "right": 30, "bottom": 40, "left": 50 },
+  "color": ["#1664FF", "#1AC6FF", "#FF8A00"],
+  "data": [
+    {
+      "id": "barData",
+      "values": [
+        { "month": "Jan", "sales": 120 },
+        { "month": "Feb", "sales": 200 },
+        { "month": "Mar", "sales": 150 }
+      ]
+    }
+  ],
+  "title": {
+    "text": "Monthly Sales",
+    "subtext": "Q1 2024"
+  },
+  "axes": [
+    { "orient": "bottom", "type": "band" },
+    { "orient": "left", "type": "linear" }
+  ],
+  "legends": [{ "visible": true, "orient": "top" }],
+  "tooltip": { "visible": true, "trigger": "hover" },
+  "crosshair": { "xField": { "visible": true } },
+  "theme": "light",
+  "animation": true
+}
+```
+
+## Field Reference
+
+### Core Identity
+
+<ParamField path="type" type="string" required>
+  The chart type identifier, e.g. `"bar"`, `"line"`, `"pie"`, `"scatter"`,
+  `"area"`, `"radar"`. This field is **required** on every spec and determines
+  which series and layout logic VChart uses.
+</ParamField>
+
+<ParamField path="id" type="string | number">
+  An optional user-defined identifier for the chart instance. Useful when
+  managing multiple charts and referencing them by ID in event handlers or
+  programmatic updates.
+</ParamField>
+
+### Canvas & Layout
+
+<ParamField path="width" type="number">
+  The canvas width in pixels. When specified, it takes precedence over the
+  container's computed width even if `autoFit` is `true`.
+</ParamField>
+
+<ParamField path="height" type="number">
+  The canvas height in pixels. When specified, it takes precedence over the
+  container's computed height even if `autoFit` is `true`.
+</ParamField>
+
+<ParamField path="autoFit" type="boolean" default="true">
+  When `true` (the default in browser environments), the chart resizes to fill
+  its container element. The spec-level `autoFit` takes precedence over the
+  `autoFit` passed to the `IInitOption` constructor.
+</ParamField>
+
+<ParamField path="padding" type="number | { top?: number; right?: number; bottom?: number; left?: number }">
+  The outer padding of the entire chart canvas — the space between the canvas
+  edge and the outermost layout region. Accepts a uniform number or an object
+  with per-side values.
+
+  ```json
+  { "padding": { "top": 10, "right": 20, "bottom": 10, "left": 20 } }
+  ```
+</ParamField>
+
+<ParamField path="background" type="string | object">
+  The background of the entire chart. Accepts a CSS color string, a gradient
+  object, or a full `IGroupMarkSpec` style object. Spec-level background takes
+  priority over the `background` passed in `IInitOption`.
+
+  ```json
+  { "background": "rgba(240, 248, 255, 0.8)" }
+  ```
+</ParamField>
+
+<ParamField path="layout" type="ILayoutSpec">
+  Low-level layout configuration for controlling how the chart's internal
+  regions, axes, and legend boxes are positioned. Usually you do not need to set
+  this — VChart computes layout automatically.
+</ParamField>
+
+### Data
+
+<ParamField path="data" type="IDataValues | DataView | Array">
+  The chart's primary dataset. Can be a single `IDataValues` object, a
+  `DataView` from `@visactor/vdataset`, or an array of either. Each
+  `IDataValues` object supports `id`, `values`, `transforms`, `fields`, and
+  `parser`.
+
+  ```json
+  {
+    "data": [
+      {
+        "id": "source",
+        "values": [
+          { "x": "A", "y": 10 },
+          { "x": "B", "y": 20 }
+        ],
+        "fields": {
+          "y": { "alias": "Revenue", "type": "linear" }
+        }
+      }
+    ]
+  }
+  ```
+</ParamField>
+
+<ParamField path="color" type="string[] | IVisualSpecScale">
+  A global color palette for the chart's series. Accepts an array of color
+  strings that are cycled per series, or a visual spec scale object for custom
+  domain-to-color mappings.
+
+  ```json
+  { "color": ["#5B8FF9", "#5AD8A6", "#5D7092", "#F6BD16"] }
+  ```
+</ParamField>
+
+### Series & Regions
+
+<ParamField path="series" type="ISeriesSpec[]">
+  An array of series configurations. Used in **combination charts** only — all
+  other chart types embed series configuration directly at the top level. Each
+  item specifies its own `type`, `data`, and field mappings.
+</ParamField>
+
+<ParamField path="region" type="RegionSpec[]">
+  An array of region (plot area) definitions. Regions are the rectangular areas
+  where data graphics are drawn. In most charts a single region is used. In
+  combination charts, multiple regions can be configured to create split-panel
+  layouts.
+</ParamField>
+
+<ParamField path="seriesField" type="string">
+  The data field used to differentiate multiple series within a single chart.
+  When set, each unique value in this field becomes a separate colored series.
+</ParamField>
+
+### Components
+
+<ParamField path="title" type="ITitleSpec">
+  Chart title configuration. Supports `text`, `subtext`, `visible`, alignment,
+  and rich-text formatting. The title component is positioned at the top of the
+  chart by default.
+
+  ```json
+  {
+    "title": {
+      "text": "Sales Overview",
+      "subtext": "Fiscal Year 2024",
+      "visible": true,
+      "textStyle": { "fontSize": 18, "fontWeight": "bold" }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="axes" type="ICommonAxisSpec[]">
+  An array of axis configurations. Each axis requires at minimum an `orient`
+  (e.g. `"bottom"`, `"left"`) and optionally a `type` (`"linear"`, `"band"`,
+  `"time"`, `"log"`). See the [Axis Spec](/api/axis-spec) reference for all
+  fields.
+</ParamField>
+
+<ParamField path="legends" type="ILegendSpec | ILegendSpec[]">
+  Legend configuration. Accepts a single object or array for multiple legends.
+  Supports `type: "discrete"` (default) and `type: "color"` / `type: "size"`
+  for continuous legends. See the [Legend Spec](/api/legend-spec) reference.
+</ParamField>
+
+<ParamField path="tooltip" type="ITooltipSpec">
+  Global tooltip configuration controlling visibility, trigger, render mode, and
+  content. See the [Tooltip Spec](/api/tooltip-spec) reference.
+</ParamField>
+
+<ParamField path="crosshair" type="ICrosshairSpec | ICrosshairSpec[]">
+  Crosshair (hover guide line) configuration. Typically configured per axis
+  field. Example:
+
+  ```json
+  {
+    "crosshair": {
+      "xField": { "visible": true, "line": { "type": "rect" } },
+      "yField": { "visible": true }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="dataZoom" type="IDataZoomSpec | IDataZoomSpec[]">
+  Data zoom (range slider) component configuration for panning and zooming a
+  continuous axis. Accepts one or an array of data-zoom specs, each targeting a
+  specific `orient`.
+</ParamField>
+
+<ParamField path="scrollBar" type="IScrollBarSpec | IScrollBarSpec[]">
+  Scroll bar component for scrolling through large data sets on a band axis.
+  Complements `dataZoom` for discrete axes.
+</ParamField>
+
+<ParamField path="brush" type="IBrushSpec">
+  Brush (rectangle selection) interaction configuration. Enables users to drag
+  to select a region of data. Supports `brushType` (`"rect"`, `"polygon"`,
+  `"x"`, `"y"`), and callback hooks.
+</ParamField>
+
+<ParamField path="player" type="IPlayer">
+  Timeline player component for animating through data slices (e.g. in a year-
+  over-year animation). Provides play, pause, and step controls.
+</ParamField>
+
+<ParamField path="customMark" type="ICustomMarkSpec[]">
+  An array of custom graphic marks drawn on top of the chart. Each item
+  specifies a `type` (e.g. `"rect"`, `"symbol"`, `"text"`, `"image"`) and full
+  `style`/`state` control — useful for watermarks, reference annotations, or
+  decorative elements.
+</ParamField>
+
+### Animation
+
+<ParamField path="animation" type="boolean" default="true">
+  Master switch for chart animations. When `false`, all enter, exit, and update
+  animations are disabled globally. Individual series can still override this
+  with their own `animation` field.
+</ParamField>
+
+<ParamField path="animationThreshold" type="number">
+  The maximum number of data points in a single series before animations are
+  automatically disabled for performance. Defaults to a library-managed value.
+  Set to `Infinity` to never auto-disable.
+</ParamField>
+
+### Interaction
+
+<ParamField path="hover" type="boolean | IHoverSpec" default="true">
+  Controls hover highlighting. Set `false` to disable hover effects globally, or
+  provide an `IHoverSpec` object to configure which element triggers highlight
+  and the `trigger` type (`"item"` or `"dimension"`).
+</ParamField>
+
+<ParamField path="select" type="boolean | ISelectSpec" default="true">
+  Controls click-selection behavior. Accepts `false` to disable or an
+  `ISelectSpec` to configure `mode` (`"single"` or `"multiple"`), trigger, and
+  other options.
+</ParamField>
+
+<ParamField path="interactions" type="IInteractionSpec[]">
+  An array of explicit interaction specs for richer interaction composition.
+  Each spec references an interaction type registered with VChart's interaction
+  system.
+</ParamField>
+
+### Theming
+
+<ParamField path="theme" type="string | Omit<ITheme, 'name'>">
+  Applies a theme to this chart instance. Pass a registered theme name (e.g.
+  `"dark"`) or an inline theme object. The spec-level `theme` is merged on top
+  of the global theme set via `VChart.ThemeManager`.
+
+  ```json
+  { "theme": "dark" }
+  ```
+</ParamField>
+
+<ParamField path="scales" type="IVisualSpecScale[]">
+  Global scale definitions shared across the chart. Each scale has an `id` so
+  that series, axes, and legends can reference it by name instead of each
+  defining their own mapping.
+</ParamField>
+
+### Stacking
+
+<ParamField path="stackInverse" type="boolean" default="false">
+  When stacking is active, reverses the stacking order so that the first series
+  is rendered at the top rather than the bottom.
+</ParamField>
+
+<ParamField path="stackSort" type="boolean" default="false">
+  When stacking is active, sorts the stack by value before rendering. Available
+  since v1.10.4.
+</ParamField>
+
+### Responsive
+
+<ParamField path="media" type="IMediaQuerySpec">
+  Media query rules for responsive chart specs. Each rule specifies a `query`
+  (breakpoint condition) and a partial spec `action` to merge when the query
+  matches. Available since v1.8.0.
+</ParamField>
+
+## Data Values Schema
+
+When providing inline data, the `IDataValues` object supports the following sub-fields:
+
+```typescript
+interface IDataValues {
+  id?: string | number;           // Unique identifier for this dataset
+  values: Datum[] | string;       // Array of records, or a CSV/TSV string
+  fromDataIndex?: number;         // Reference another dataset by index
+  fromDataId?: string | number;   // Reference another dataset by id
+  transforms?: BuildInTransformOptions[]; // filter, fold, fields, simplify
+  fields?: Record<string, IFieldsMeta>;   // Per-field metadata
+  parser?: SheetParseOptions;     // CSV / TSV / DSV parser config
+}
+```
+
+<Tip>
+  When `fromDataId` or `fromDataIndex` is set, the values array is treated as a
+  transform chain applied on top of the referenced dataset, enabling data
+  sharing between series without duplication.
+</Tip>
+
+## Common Patterns
+
+<Tabs>
+  <Tab title="Minimal Bar Chart">
+    ```json
+    {
+      "type": "bar",
+      "data": [{ "values": [{ "x": "A", "y": 10 }, { "x": "B", "y": 20 }] }],
+      "xField": "x",
+      "yField": "y"
+    }
+    ```
+  </Tab>
+  <Tab title="With Title & Legend">
+    ```json
+    {
+      "type": "line",
+      "data": [{ "values": [{ "x": 1, "y": 10, "group": "A" }] }],
+      "xField": "x",
+      "yField": "y",
+      "seriesField": "group",
+      "title": { "text": "My Line Chart" },
+      "legends": [{ "visible": true, "orient": "bottom" }]
+    }
+    ```
+  </Tab>
+  <Tab title="Dark Theme + Animation Off">
+    ```json
+    {
+      "type": "scatter",
+      "theme": "dark",
+      "animation": false,
+      "data": [{ "values": [] }],
+      "xField": "x",
+      "yField": "y"
+    }
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  Fields like `xField`, `yField`, `categoryField`, and `valueField` are
+  **not** common fields — they are specific to each chart/series type. Always
+  check the relevant chart type's spec documentation for those fields.
+</Note>

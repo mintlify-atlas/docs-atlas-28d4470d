@@ -1,0 +1,364 @@
+---
+title: "Custom Marks: Extend VChart with Custom Graphics"
+sidebarTitle: "Custom Marks"
+description: "Add arbitrary VRender graphics to any VChart chart using the customMark component, graphic creator utilities, and HTML/React attribute plugins."
+---
+
+VChart's `customMark` component lets you layer any VRender graphic primitive — text, rectangles, arcs, symbols, images, or full group hierarchies — directly onto a chart canvas without forking the library. You define one or more entries in the top-level `customMark` array of your spec. Each entry is an `ICustomMarkSpec` object describing the mark type, optional data binding, positional style, and interaction state. The marks live in the VChart layout system alongside axes and legends, so they participate in the same coordinate space and resize correctly when the chart reflows. For even richer overlays you can inject HTML DOM nodes or React components using the `registerHtmlAttributePlugin` and `registerReactAttributePlugin` plugins.
+
+## Registering the Component
+
+`customMark` is included in the default `@visactor/vchart` bundle via `vchart-all.ts`. If you are using the tree-shakeable path you must register it explicitly:
+
+```ts
+import VChart from '@visactor/vchart';
+import { registerCustomMark } from '@visactor/vchart';
+
+VChart.useRegisters([registerCustomMark]);
+```
+
+---
+
+## Spec Reference
+
+Every chart spec that extends `IChartSpec` accepts a `customMark` array:
+
+```ts
+// packages/vchart/src/typings/spec/common.ts (line 217)
+customMark?: ICustomMarkSpec<EnableMarkType>[];
+```
+
+<ParamField path="customMark[].type" type="EnableMarkType" required>
+  The graphic primitive to render. One of `'text'`, `'rect'`, `'arc'`, `'symbol'`, `'image'`, `'path'`, `'line'`, `'area'`, `'polygon'`, `'richtext'`, `'group'`.
+</ParamField>
+
+<ParamField path="customMark[].id" type="string | number">
+  Optional user-assigned ID. Use this to reference the mark from other specs or extension marks via the `parent` field.
+</ParamField>
+
+<ParamField path="customMark[].name" type="string">
+  Human-readable name exposed in event filters such as `{ markName: 'myAnnotation' }`. Available since v1.12.5.
+</ParamField>
+
+<ParamField path="customMark[].dataIndex" type="number">
+  Zero-based index into the chart's `data` array. The mark is bound to that dataset and re-renders whenever the data updates. Defaults to the series data.
+</ParamField>
+
+<ParamField path="customMark[].dataId" type="string | number">
+  Alternative to `dataIndex` — identifies the dataset by its `id` field.
+</ParamField>
+
+<ParamField path="customMark[].dataKey" type="string | ((datum: any) => string)">
+  Key accessor for joining data rows to mark instances. Mirrors the series-level `dataKey`. Available since v1.9.5.
+</ParamField>
+
+<ParamField path="customMark[].interactive" type="boolean" default="false">
+  When `true` the mark participates in pointer events and can trigger tooltip / crosshair interactions.
+</ParamField>
+
+<ParamField path="customMark[].visible" type="boolean" default="true">
+  Show or hide the mark layer without removing it from the spec.
+</ParamField>
+
+<ParamField path="customMark[].zIndex" type="number">
+  Z-order relative to other marks. Increase to render on top of data marks.
+</ParamField>
+
+<ParamField path="customMark[].style" type="ConvertToMarkStyleSpec<T>">
+  Declarative style object whose shape depends on `type`. Values can be scalars or accessor functions `(datum, ctx) => value`. For a `'text'` mark the relevant fields are `text`, `x`, `y`, `fill`, `fontSize`, `fontWeight`, etc. (all fields from `ICommonSpec`).
+</ParamField>
+
+<ParamField path="customMark[].state" type="IMarkStateFullSpec">
+  Style overrides for named interaction states: `hover`, `selected`, `selected_reverse`, and any custom states.
+</ParamField>
+
+<ParamField path="customMark[].animation" type="boolean" default="false">
+  Enable enter/exit/update animations for this mark. Uses the same animation config as built-in marks. Available since v1.11.0.
+</ParamField>
+
+<ParamField path="customMark[].parent" type="string">
+  ID of a group mark that should act as the parent container for this mark. Available since v1.13.0.
+</ParamField>
+
+<ParamField path="customMark[].componentType" type="string">
+  Register a VRender graphic component by name instead of a built-in primitive. Used internally by extension components such as `regressionLine`. Available since v1.9.0.
+</ParamField>
+
+### Group Marks
+
+Set `type: 'group'` and provide a `children` array to build composite custom marks:
+
+```ts
+// ICustomMarkGroupSpec
+{
+  type: 'group',
+  id: 'badge-group',
+  style: { x: 100, y: 20 },
+  children: [
+    {
+      type: 'rect',
+      style: { width: 80, height: 24, fill: '#4A90E2', cornerRadius: 4 }
+    },
+    {
+      type: 'text',
+      style: { x: 40, y: 12, text: 'Max', fill: '#fff', textAlign: 'center', textBaseline: 'middle' }
+    }
+  ]
+}
+```
+
+---
+
+## VRender Graphic Primitives
+
+VChart re-exports the VRender creator functions and graphic type interfaces so you do not need to install `@visactor/vrender-core` separately:
+
+```ts
+import {
+  createImage,
+  createPath,
+  graphicCreator,
+  type IGraphic,
+  type IGroup,
+  type IText,
+  type IRect,
+  type IArc,   // see IArea / IArc from vrender-core
+  type ISymbol,
+  type ILine,
+  type IArea,
+  type IStage,
+  type ITextGraphicAttribute,
+  type IRectGraphicAttribute,
+  type IGroupGraphicAttribute,
+  type ISymbolGraphicAttribute,
+  type IAreaGraphicAttribute,
+  type ILineGraphicAttribute
+} from '@visactor/vchart';
+```
+
+<CardGroup cols={3}>
+  <Card title="createImage(attrs)" icon="image">
+    Creates an image graphic. Provide `image` (URL or `HTMLImageElement`), `x`, `y`, `width`, `height`.
+  </Card>
+  <Card title="createPath(attrs)" icon="bezier-curve">
+    Creates a custom SVG path graphic. Provide a `path` string in SVG `d` notation.
+  </Card>
+  <Card title="graphicCreator" icon="wand-sparkles">
+    Factory object with `createXxx` methods for every primitive — useful when the type is dynamic.
+  </Card>
+  <Card title="IGraphic" icon="vector-square">
+    Base interface for all VRender primitives. Every mark instance implements this interface.
+  </Card>
+  <Card title="IGroup" icon="object-group">
+    Container graphic. Implements `addMark`, `removeMark`, and spatial transform methods.
+  </Card>
+  <Card title="IText / IRect / IArc / ISymbol" icon="shapes">
+    Typed interfaces for specific primitives — use these for type-safe `style` callbacks.
+  </Card>
+</CardGroup>
+
+---
+
+## Examples
+
+### Text Annotation on a Line Chart
+
+The following example adds a permanent "Peak" text label at the datum with the highest value, using a data-driven accessor function for positioning:
+
+```ts
+import VChart from '@visactor/vchart';
+import { registerCustomMark, registerLineChart } from '@visactor/vchart';
+
+VChart.useRegisters([registerLineChart, registerCustomMark]);
+
+const values = [
+  { month: 'Jan', sales: 30 },
+  { month: 'Feb', sales: 55 },
+  { month: 'Mar', sales: 48 },
+  { month: 'Apr', sales: 72 }, // ← peak
+  { month: 'May', sales: 61 }
+];
+
+const spec = {
+  type: 'line',
+  data: [{ id: 'lineData', values }],
+  xField: 'month',
+  yField: 'sales',
+  // --- custom mark: text annotation at the peak datum ---
+  customMark: [
+    {
+      type: 'text',
+      dataId: 'lineData',
+      interactive: false,
+      zIndex: 500,
+      style: {
+        // accessor functions receive (datum, ctx) and return a style value
+        x: (datum, ctx) => ctx.getLayoutBounds().x1 + 10,
+        y: (datum, ctx) => {
+          // only render the label at the peak row
+          return datum.sales === 72 ? (ctx.vchart as any)
+            .getChart()
+            .getScaleInGlobalRange?.('yField', datum.sales) ?? 60 : null;
+        },
+        text: datum => (datum.sales === 72 ? `▲ Peak: ${datum.sales}` : ''),
+        fill: '#e53935',
+        fontSize: 12,
+        fontWeight: 'bold',
+        textAlign: 'left',
+        textBaseline: 'bottom'
+      }
+    }
+  ]
+};
+
+const vchart = new VChart(spec, { dom: 'container' });
+vchart.renderAsync();
+```
+
+### Rect Overlay Using Group Children
+
+```ts
+const spec = {
+  type: 'bar',
+  data: [{ id: 'bar', values: [
+    { cat: 'A', val: 40 }, { cat: 'B', val: 65 }, { cat: 'C', val: 55 }
+  ]}],
+  xField: 'cat',
+  yField: 'val',
+  customMark: [
+    {
+      type: 'group',
+      id: 'target-band',
+      style: { x: 0, y: 0 },
+      children: [
+        {
+          type: 'rect',
+          style: {
+            x: 0,
+            y: (datum, ctx) => {
+              const bounds = ctx.getLayoutBounds();
+              return bounds.y1 + (bounds.y2 - bounds.y1) * 0.3;
+            },
+            width: (datum, ctx) => {
+              const b = ctx.getLayoutBounds();
+              return b.x2 - b.x1;
+            },
+            height: (datum, ctx) => {
+              const b = ctx.getLayoutBounds();
+              return (b.y2 - b.y1) * 0.1;
+            },
+            fill: '#FFF176',
+            fillOpacity: 0.4
+          }
+        },
+        {
+          type: 'text',
+          style: {
+            x: 8, y: (datum, ctx) => {
+              const b = ctx.getLayoutBounds();
+              return b.y1 + (b.y2 - b.y1) * 0.34;
+            },
+            text: 'Target Range',
+            fill: '#F57F17',
+            fontSize: 11
+          }
+        }
+      ]
+    }
+  ]
+};
+```
+
+---
+
+## HTML and React Attribute Plugins
+
+For overlays that need DOM interactivity — tooltips built with React, editable input fields, or any HTML content — VChart provides two plugins that expose special `html` and `react` style attributes on any mark.
+
+<Tabs>
+  <Tab title="HTML Plugin">
+    Register `registerHtmlAttributePlugin` to enable the `html` style attribute. The value is an object with a `dom` field (string or `HTMLElement`):
+
+    ```ts
+    import VChart from '@visactor/vchart';
+    import { registerHtmlAttributePlugin } from '@visactor/vchart';
+
+    VChart.useRegisters([registerHtmlAttributePlugin]);
+
+    const spec = {
+      type: 'scatter',
+      // ...data and field config...
+      customMark: [
+        {
+          type: 'text',
+          dataId: 'scatterData',
+          interactive: true,
+          style: {
+            x: datum => datum.px,
+            y: datum => datum.py,
+            // Inject raw HTML at this mark's position
+            html: {
+              id: 'custom-html-mark',
+              dom: datum =>
+                `<div style="background:#fff;border:1px solid #999;padding:4px 8px;border-radius:4px;font-size:11px;">
+                   <strong>${datum.label}</strong><br/>Score: ${datum.score}
+                 </div>`,
+              anchorType: 'boundsLeftTop'
+            }
+          }
+        }
+      ]
+    };
+    ```
+  </Tab>
+  <Tab title="React Plugin">
+    Register `registerReactAttributePlugin` to render React components at mark positions. The `react` style attribute accepts a `component` field:
+
+    ```ts
+    import VChart from '@visactor/vchart';
+    import { registerReactAttributePlugin } from '@visactor/vchart';
+    import React from 'react';
+
+    VChart.useRegisters([registerReactAttributePlugin]);
+
+    function Badge({ datum }) {
+      return (
+        <div style={{
+          background: '#1976D2', color: '#fff',
+          padding: '2px 6px', borderRadius: 3, fontSize: 11
+        }}>
+          {datum.name}: {datum.value}
+        </div>
+      );
+    }
+
+    const spec = {
+      type: 'bar',
+      // ...
+      customMark: [
+        {
+          type: 'text',
+          dataId: 'barData',
+          interactive: false,
+          style: {
+            x: datum => datum.x,
+            y: datum => datum.y - 8,
+            react: {
+              pointerEvents: false,
+              component: datum => React.createElement(Badge, { datum })
+            }
+          }
+        }
+      ]
+    };
+    ```
+
+    <Warning>
+      `registerReactAttributePlugin` requires React 16.8+ and a React root environment. Do not enable it in Node.js SSR paths that do not have a DOM.
+    </Warning>
+  </Tab>
+</Tabs>
+
+<Note>
+Both `registerHtmlAttributePlugin` and `registerReactAttributePlugin` are included automatically in the full `@visactor/vchart` default bundle (via `vchart-all.ts`). You only need to call them explicitly when using the tree-shakeable entry point.
+</Note>

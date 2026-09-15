@@ -1,0 +1,216 @@
+---
+title: "Understanding the VChart Spec Format"
+sidebarTitle: "Spec"
+description: "Learn how VChart's declarative JSON spec API works — from the top-level type field and ChartSpecMap to data, axes, and dynamic spec updates."
+---
+
+Every VChart chart is driven by a plain JavaScript object called the **spec**. Rather than calling a series of imperative methods to configure a chart, you describe the entire visual — its type, data, axes, legends, colors, and animations — as a single JSON-serializable value. VChart reads that object, constructs the internal model, and renders the result. This declarative approach means specs are trivially storable, diffable, and shareable: you can save one to a database, load it later, and get a pixel-perfect recreation of the original chart.
+
+## The `type` Field and `ChartSpecMap`
+
+Every spec must have a `type` string. VChart uses it to look up the correct chart class and the correct TypeScript interface for the remaining fields. All supported type strings are the keys of the `ChartSpecMap` interface:
+
+```typescript
+// packages/vchart/src/typings/spec/chart.ts
+export interface ChartSpecMap {
+  readonly common: ICommonChartSpec;
+  readonly area: IAreaChartSpec;
+  readonly line: ILineChartSpec;
+  readonly bar: IBarChartSpec;
+  readonly histogram: IHistogramChartSpec;
+  readonly rangeColumn: IRangeColumnChartSpec;
+  readonly rangeArea: IRangeAreaChartSpec;
+  readonly map: IMapChartSpec;
+  readonly pie: IPieChartSpec;
+  readonly radar: IRadarChartSpec;
+  readonly rose: IRoseChartSpec;
+  readonly scatter: IScatterChartSpec;
+  readonly sequence: ISequenceChartSpec;
+  readonly circleProgress: ICircularProgressChartSpec;
+  readonly linearProgress: ILinearProgressChartSpec;
+  readonly wordCloud: IWordCloudChartSpec;
+  readonly funnel: IFunnelChartSpec;
+  readonly waterfall: IWaterfallChartSpec;
+  readonly boxplot: IBoxPlotChartSpec;
+  readonly gauge: IGaugeChartSpec;
+  readonly sankey: ISankeyChartSpec;
+  readonly treemap: ITreemapChartSpec;
+  readonly sunburst: ISunburstChartSpec;
+  readonly circlePacking: ICirclePackingChartSpec;
+  readonly heatmap: IHeatmapChartSpec;
+  readonly correlation: ICorrelationChartSpec;
+  readonly liquid: ILiquidChartSpec;
+}
+
+export type ISpec = ChartSpecMap[keyof ChartSpecMap] | IChartSpec;
+```
+
+`ISpec` is the union of every specific chart spec plus the generic `IChartSpec` base. When you write `const spec: ISpec = { type: 'bar', ... }`, TypeScript narrows the type automatically based on the `type` discriminant.
+
+## `IChartSpec` — Top-Level Fields
+
+Every chart spec extends `IChartSpec`. These are the fields you will use most often:
+
+<Accordion title="Core layout & sizing">
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `type` | `string` | Chart type identifier — **required**. |
+| `width` | `number` | Canvas width in pixels. Omit to let the chart fill its container. |
+| `height` | `number` | Canvas height in pixels. |
+| `autoFit` | `boolean` | Automatically resize to fill the container (default `true` in browsers). |
+| `padding` | `ILayoutPaddingSpec` | Inner padding around the chart plot area. Accepts a number or `{ top, right, bottom, left }`. |
+| `background` | `IColor \| IGroupMarkSpec` | Chart background color or a full mark style spec including gradients. |
+
+</Accordion>
+
+<Accordion title="Data & series">
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `data` | `IDataValues \| DataView \| array` | Inline data or a vdataset `DataView`. |
+| `series` | `ISeriesSpec[]` | Used in `common` composite charts to mix multiple series types. |
+| `seriesField` | `string` | Groups rows into separate series by the named field. |
+| `color` | `string[]` | Overrides the active theme's color palette with a custom list. |
+
+</Accordion>
+
+<Accordion title="Components">
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `axes` | `ICommonAxisSpec[]` | One or more axis configurations. |
+| `legends` | `ILegendSpec \| ILegendSpec[]` | Legend configuration(s). |
+| `tooltip` | `ITooltipSpec` | Tooltip configuration. |
+| `title` | `ITitleSpec` | Chart title and subtitle. |
+| `crosshair` | `ICrosshairSpec \| ICrosshairSpec[]` | Cross-hair guide lines. |
+| `dataZoom` | `IDataZoomSpec \| IDataZoomSpec[]` | Range sliders for zooming into data. |
+| `scrollBar` | `IScrollBarSpec \| IScrollBarSpec[]` | Scroll bars on overflow axes. |
+| `brush` | `IBrushSpec` | Mouse-drag selection / brush interaction. |
+| `player` | `IPlayer` | Animated data-player control. |
+
+</Accordion>
+
+<Accordion title="Interaction & animation">
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `hover` | `boolean \| IHoverSpec` | Enable / configure hover highlighting. |
+| `select` | `boolean \| ISelectSpec` | Enable / configure click selection. |
+| `animationThreshold` | `number` | Automatically disable animations when a series contains more data points than this value. |
+| `stackInverse` | `boolean` | Reverse the stacking order of series. |
+| `theme` | `string \| ITheme` | Per-chart theme override — higher priority than the global theme. |
+| `media` | `IMediaQuerySpec` | Responsive spec overrides triggered by container size breakpoints. |
+
+</Accordion>
+
+## Annotated Bar Chart Spec
+
+Below is a complete, annotated bar chart spec that demonstrates the most common fields together:
+
+```javascript
+const spec = {
+  // ── Chart type ──────────────────────────────────────────────
+  type: 'bar',
+
+  // ── Canvas size & padding ────────────────────────────────────
+  width: 600,
+  height: 400,
+  padding: { top: 20, right: 20, bottom: 60, left: 60 },
+
+  // ── Inline data ──────────────────────────────────────────────
+  data: [
+    {
+      id: 'barData',
+      values: [
+        { month: 'Jan', sales: 120, category: 'A' },
+        { month: 'Feb', sales: 200, category: 'A' },
+        { month: 'Mar', sales: 150, category: 'A' },
+        { month: 'Jan', sales: 80,  category: 'B' },
+        { month: 'Feb', sales: 140, category: 'B' },
+        { month: 'Mar', sales: 100, category: 'B' }
+      ]
+    }
+  ],
+
+  // ── Field mapping ────────────────────────────────────────────
+  xField: 'month',      // maps rows → x-axis bands
+  yField: 'sales',      // maps rows → bar height
+  seriesField: 'category', // each unique value → separate color group
+
+  // ── Axes ─────────────────────────────────────────────────────
+  axes: [
+    { orient: 'bottom', type: 'band' },
+    { orient: 'left',   type: 'linear', title: { visible: true, text: 'Sales' } }
+  ],
+
+  // ── Legend ───────────────────────────────────────────────────
+  legends: { visible: true, orient: 'top' },
+
+  // ── Tooltip ──────────────────────────────────────────────────
+  tooltip: { visible: true },
+
+  // ── Title ────────────────────────────────────────────────────
+  title: { text: 'Monthly Sales by Category', subtext: 'Jan–Mar' },
+
+  // ── Chart-level animation ────────────────────────────────────
+  animation: true,
+
+  // ── Per-chart theme override ─────────────────────────────────
+  theme: 'light'
+};
+
+const chart = new VChart(spec, { dom: 'chart-container' });
+chart.renderSync();
+```
+
+## Dynamic Spec Updates with `updateSpec()`
+
+Charts are not static. When your application state changes you can replace or merge the spec using `updateSpec()` (async) or `updateSpecSync()` (synchronous). VChart diffs the old and new specs, determines what needs to be rebuilt, and re-renders efficiently.
+
+<CodeGroup>
+
+```javascript Async
+// Replace axis title on the fly
+await chart.updateSpec({
+  ...spec,
+  axes: [
+    { orient: 'bottom', type: 'band' },
+    { orient: 'left', type: 'linear', title: { visible: true, text: 'Revenue ($)' } }
+  ]
+});
+```
+
+```javascript Sync
+// Switch to a stacked bar without a full page reload
+chart.updateSpecSync({
+  ...spec,
+  stack: true
+});
+```
+
+</CodeGroup>
+
+<Tip>
+Pass `forceMerge: true` as the second argument to deep-merge the new spec into the existing one instead of replacing it entirely. This is useful when you only want to patch a small section and do not have the full spec at hand.
+</Tip>
+
+## Spec Validation & TypeScript
+
+Because `ISpec` is a discriminated union, TypeScript validates field names and value types for every chart type. You get autocomplete for chart-specific fields (`xField`, `yField`, `barWidth`, etc.) as soon as you supply a `type` literal:
+
+```typescript
+import type { IBarChartSpec } from '@visactor/vchart';
+
+const spec: IBarChartSpec = {
+  type: 'bar',
+  data: { id: 'sales', values: [] },
+  xField: 'month',
+  yField: 'sales',
+  barWidth: '60%'    // ✅ recognised — specific to bar charts
+};
+```
+
+<Note>
+Field-level specs for individual chart types (e.g. `IBarChartSpec`, `IPieChartSpec`) extend the base `IChartSpec` and add their own required and optional fields. Refer to the individual chart-type pages for those details.
+</Note>

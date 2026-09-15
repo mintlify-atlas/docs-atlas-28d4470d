@@ -1,0 +1,357 @@
+---
+title: "Installing VChart: npm, CDN, and Mini-Programs"
+sidebarTitle: "Installation"
+description: "Install @visactor/vchart via npm, yarn, pnpm, or CDN. Configure browser, Node.js, and mini-program environments, and tree-shake for smaller bundles."
+---
+
+`@visactor/vchart` is distributed as a standard npm package with separate ESM and CJS builds. It ships a pre-bundled UMD file for CDN usage and exposes every environment adapter, chart-type register, and component register as individually importable named exports — so you can tree-shake aggressively and ship only what your application uses.
+
+## Package Managers
+
+<CodeGroup>
+  ```bash npm
+  npm install @visactor/vchart
+  ```
+
+  ```bash yarn
+  yarn add @visactor/vchart
+  ```
+
+  ```bash pnpm
+  pnpm add @visactor/vchart
+  ```
+</CodeGroup>
+
+The current stable version is **2.1.6**. Once installed the package exposes three entry points:
+
+| Entry point | Format | Used by |
+|---|---|---|
+| `esm/index.js` | ES Module | Bundlers (Vite, webpack, Rollup) |
+| `cjs/index.js` | CommonJS | Node.js `require()` |
+| `build/index.min.js` | UMD (minified) | CDN `<script>` tag |
+
+## CDN Usage
+
+For quick prototypes or environments where a bundler is unavailable, load VChart directly from unpkg. The UMD build exposes the `VChart` constructor on `window.VChart`.
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>VChart CDN Demo</title>
+    <style>
+      #chart { width: 600px; height: 400px; }
+    </style>
+  </head>
+  <body>
+    <div id="chart"></div>
+
+    <!-- Load VChart from unpkg -->
+    <script src="https://unpkg.com/@visactor/vchart/build/index.min.js"></script>
+
+    <script>
+      const spec = {
+        type: 'bar',
+        data: [{
+          id: 'barData',
+          values: [
+            { month: 'Monday',    sales: 22 },
+            { month: 'Tuesday',   sales: 13 },
+            { month: 'Wednesday', sales: 25 },
+            { month: 'Thursday',  sales: 29 },
+            { month: 'Friday',    sales: 38 }
+          ]
+        }],
+        xField: 'month',
+        yField: 'sales'
+      };
+
+      // The UMD build auto-registers the browser environment
+      const vchart = new VChart.default(spec, { dom: 'chart' });
+      vchart.renderAsync();
+    </script>
+  </body>
+</html>
+```
+
+<Note>
+  The uncompressed build is available at `https://unpkg.com/@visactor/vchart/build/index.js` if you need readable source for debugging. Pin a specific version in production: `https://unpkg.com/@visactor/vchart@2.1.6/build/index.min.js`.
+</Note>
+
+## Environment Setup
+
+VChart separates chart logic from runtime concerns. Before creating any chart instance you must register an **environment adapter** that supplies the correct canvas implementation, event model, and context APIs for your target platform.
+
+<Tabs>
+  <Tab title="Browser">
+
+    Call `registerBrowserEnv()` once in your application entry point, before any `new VChart(...)` calls.
+
+    ```typescript
+    import VChart from '@visactor/vchart';
+    import { registerBrowserEnv } from '@visactor/vchart';
+
+    // Register the browser canvas + event adapter
+    registerBrowserEnv();
+
+    const vchart = new VChart(
+      {
+        type: 'bar',
+        data: [{
+          id: 'barData',
+          values: [
+            { month: 'Monday',    sales: 22 },
+            { month: 'Tuesday',   sales: 13 },
+            { month: 'Wednesday', sales: 25 },
+            { month: 'Thursday',  sales: 29 },
+            { month: 'Friday',    sales: 38 }
+          ]
+        }],
+        xField: 'month',
+        yField: 'sales'
+      },
+      { dom: 'chart' }
+    );
+
+    await vchart.renderAsync();
+    ```
+
+    You can pass a DOM element directly instead of an ID string:
+
+    ```typescript
+    const container = document.getElementById('chart') as HTMLElement;
+    const vchart = new VChart(spec, { dom: container });
+    ```
+
+    Or pass a `<canvas>` element / canvas ID via `renderCanvas` instead of `dom` — useful when you need full control of the canvas lifecycle:
+
+    ```typescript
+    const vchart = new VChart(spec, { renderCanvas: 'myCanvas' });
+    ```
+
+  </Tab>
+
+  <Tab title="Node.js">
+
+    Server-side rendering requires the `node-canvas` package (which provides a native canvas implementation) plus VChart's Node.js environment adapter.
+
+    ```bash
+    npm install canvas @visactor/vchart
+    ```
+
+    ```typescript
+    import { createCanvas } from 'canvas';
+    import { VChart } from '@visactor/vchart';
+    import { registerNodeEnv } from '@visactor/vchart';
+
+    // Register the Node.js canvas adapter
+    registerNodeEnv();
+
+    const canvas = createCanvas(600, 400);
+
+    const vchart = new VChart(
+      {
+        type: 'bar',
+        data: [{
+          id: 'barData',
+          values: [
+            { month: 'Monday',    sales: 22 },
+            { month: 'Tuesday',   sales: 13 },
+            { month: 'Wednesday', sales: 25 },
+            { month: 'Thursday',  sales: 29 },
+            { month: 'Friday',    sales: 38 }
+          ]
+        }],
+        xField: 'month',
+        yField: 'sales'
+      },
+      {
+        renderCanvas: canvas as unknown as HTMLCanvasElement,
+        // Disable animation for static server-side output
+        animation: false
+      }
+    );
+
+    await vchart.renderAsync();
+
+    // Export to PNG buffer
+    const buffer = canvas.toBuffer('image/png');
+    ```
+
+    <Note>
+      Disable `animation` when rendering server-side. Animations require a requestAnimationFrame loop which doesn't exist in Node.js, and leaving it enabled can produce incomplete renders.
+    </Note>
+
+  </Tab>
+
+  <Tab title="Mini-Programs">
+
+    Each mini-program environment has a dedicated adapter. Import and call the one matching your target platform:
+
+    ```typescript
+    import { registerWXEnv }      from '@visactor/vchart'; // WeChat
+    import { registerLarkEnv }    from '@visactor/vchart'; // Feishu / Lark
+    import { registerTaroEnv }    from '@visactor/vchart'; // Taro
+    import { registerTTEnv }      from '@visactor/vchart'; // ByteDance TT
+    import { registerHarmonyEnv } from '@visactor/vchart'; // Harmony OS
+    import { registerLynxEnv }    from '@visactor/vchart'; // Lynx
+    ```
+
+    For mini-programs, pass the canvas element ID via `renderCanvas` rather than `dom`, because mini-program environments do not expose a standard DOM:
+
+    ```typescript
+    // WeChat Mini-Program example
+    import { VChart } from '@visactor/vchart';
+    import { registerWXEnv } from '@visactor/vchart';
+
+    registerWXEnv();
+
+    // canvasId must match the canvas component's id in your WXML template
+    const vchart = new VChart(spec, { renderCanvas: 'myChartCanvas' });
+    await vchart.renderAsync();
+    ```
+
+    <Tip>
+      For WeChat, Taro, and Lark environments consider using the dedicated wrapper packages (`@visactor/wx-vchart`, `@visactor/taro-vchart`, `@visactor/lark-vchart`) which handle the canvas binding and lifecycle automatically.
+    </Tip>
+
+  </Tab>
+</Tabs>
+
+## Constructor Options (`IInitOption`)
+
+The second argument to `new VChart(spec, options)` accepts an `IInitOption` object. All fields are optional unless you omit both `dom` and `renderCanvas` (in which case VChart has nowhere to render).
+
+<ParamField path="dom" type="string | HTMLElement">
+  The DOM container to render into. Accepts a container element `id` string or an `HTMLElement` reference. **Browser only.**
+</ParamField>
+
+<ParamField path="renderCanvas" type="string | HTMLCanvasElement">
+  A `<canvas>` element or its `id` attribute. Use instead of `dom` when you need direct canvas control, or in mini-program environments. Accepts a canvas ID string in mini-programs.
+</ParamField>
+
+<ParamField path="autoFit" type="boolean" default="true">
+  Whether the chart should automatically resize when the container dimensions change. When `true`, VChart attaches a `ResizeObserver` (browser) and re-lays out the chart. Equivalent to setting `autoFit: true` inside the spec; the spec value takes precedence.
+</ParamField>
+
+<ParamField path="animation" type="boolean" default="true">
+  Master switch for all chart animations. Set to `false` for server-side rendering or performance-sensitive environments with very large datasets.
+</ParamField>
+
+<ParamField path="poptip" type="boolean" default="true">
+  When `true`, hovering over truncated text labels shows a popover with the full text value. Disable if you handle overflow styling yourself.
+</ParamField>
+
+<ParamField path="theme" type="string | ITheme">
+  Apply a theme at construction time. Pass a registered theme name string or a full `ITheme` object. The spec's `theme` field takes precedence over this value.
+</ParamField>
+
+<ParamField path="disableTriggerEvent" type="boolean" default="false">
+  Set to `true` to disable all built-in interaction events (hover, click, brush, crosshair). Useful for fully static embed contexts where interaction overhead is undesirable.
+</ParamField>
+
+<ParamField path="resizeDelay" type="number" default="100">
+  Debounce delay in milliseconds between a container resize event firing and VChart recalculating layout. Increase this value if resize recalculations are causing jank on complex charts.
+</ParamField>
+
+<ParamField path="onError" type="(...args: any[]) => void">
+  Error callback invoked when VChart encounters a recoverable internal error. Use this to surface rendering errors to your own logging or monitoring system. Available since v1.2.0.
+</ParamField>
+
+<ParamField path="dataSet" type="DataSet">
+  An existing `@visactor/vdataset` `DataSet` instance to share between multiple charts. Useful when several charts consume the same data pipeline and you want transforms to run only once.
+</ParamField>
+
+## React Integration
+
+For React applications, use the official `@visactor/react-vchart` wrapper. It provides chart-type components with React prop binding and handles the VChart instance lifecycle (create on mount, `updateSpec` on prop change, `release` on unmount).
+
+```bash
+npm install @visactor/react-vchart
+```
+
+```tsx
+import React from 'react';
+import { BarChart } from '@visactor/react-vchart';
+import type { IBarChartSpec } from '@visactor/react-vchart';
+
+const spec: IBarChartSpec = {
+  type: 'bar',
+  data: [{
+    id: 'barData',
+    values: [
+      { month: 'Monday',    sales: 22 },
+      { month: 'Tuesday',   sales: 13 },
+      { month: 'Wednesday', sales: 25 },
+      { month: 'Thursday',  sales: 29 },
+      { month: 'Friday',    sales: 38 }
+    ]
+  }],
+  xField: 'month',
+  yField: 'sales'
+};
+
+export default function App() {
+  return (
+    <BarChart
+      spec={spec}
+      style={{ height: '400px' }}
+    />
+  );
+}
+```
+
+<Note>
+  `@visactor/react-vchart` re-exports `VChartCore` from `@visactor/vchart` if you need to call static methods such as `ThemeManager.registerTheme` or `VChart.useRegisters`.
+</Note>
+
+## Tree-Shaking with `VChart.useRegisters()`
+
+<Note>
+  The default `import VChart from '@visactor/vchart'` import uses `vchart-all`, which calls `VChart.useRegisters([...])` with every available chart type, component, and plugin already registered. This is the simplest starting point but produces the largest bundle.
+
+  To optimise bundle size, import the bare VChart core and register only the features your application actually uses:
+
+  ```typescript
+  // Import the core class — no charts or components registered yet
+  import { VChart } from '@visactor/vchart';
+
+  // Import only the chart types you need
+  import { registerBarChart }             from '@visactor/vchart';
+  import { registerLineChart }            from '@visactor/vchart';
+
+  // Import only the components you need
+  import {
+    registerCartesianLinearAxis,
+    registerCartesianBandAxis
+  }                                        from '@visactor/vchart';
+  import { registerDiscreteLegend }        from '@visactor/vchart';
+  import { registerTooltip }               from '@visactor/vchart';
+  import { registerLabel }                 from '@visactor/vchart';
+  import { registerAnimate }               from '@visactor/vchart';
+
+  // Import the environment adapter
+  import { registerBrowserEnv }            from '@visactor/vchart';
+
+  // Register everything in one call
+  VChart.useRegisters([
+    registerBarChart,
+    registerLineChart,
+    registerCartesianLinearAxis,
+    registerCartesianBandAxis,
+    registerDiscreteLegend,
+    registerTooltip,
+    registerLabel,
+    registerAnimate
+  ]);
+
+  registerBrowserEnv();
+
+  // Now create chart instances as usual
+  const vchart = new VChart(spec, { dom: 'chart' });
+  await vchart.renderAsync();
+  ```
+
+  `useRegisters` accepts an array of register functions. Each function is idempotent — calling it multiple times is safe. The call must happen **before** the first `new VChart(...)` for the registrations to take effect.
+</Note>

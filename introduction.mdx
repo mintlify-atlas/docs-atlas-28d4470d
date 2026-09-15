@@ -1,0 +1,115 @@
+---
+title: "VChart: Expressive Cross-Platform Charting Library"
+sidebarTitle: "Introduction"
+description: "VChart is a declarative, cross-platform charting library from the VisActor ecosystem with 25+ chart types, animations, theming, and tree-shakable architecture."
+---
+
+VChart is a charting library built on top of [VGrammar](https://www.visactor.io/vgrammar) (a visual grammar engine) and [VRender](https://www.visactor.io/vrender) (a high-performance rendering engine). Both are core parts of the [VisActor](https://www.visactor.io/) visualization ecosystem. Rather than wrapping a third-party renderer, VChart owns its entire rendering stack — giving it fine-grained control over performance, animation, and cross-platform compatibility. You describe what you want using a plain JSON **spec** object, and VChart handles layout, scaling, theming, interaction, and animation automatically. Whether you're targeting a desktop browser, a mobile WebView, Node.js for server-side rendering, or a WeChat/Feishu/Taro mini-program, the same spec works without modification.
+
+## Where VChart Fits
+
+VChart sits at the top of the VisActor stack. VRender handles GPU-accelerated canvas drawing; VGrammar provides a declarative grammar of graphics; VChart adds chart-level abstractions — axes, legends, tooltips, data transforms, series types, and the full set of chart-specific components — on top of that grammar layer. You interact exclusively with VChart's public API and never need to touch the lower layers directly.
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="bolt" href="/quickstart">
+    Build your first chart in under 5 minutes with a working bar chart example.
+  </Card>
+  <Card title="Installation" icon="package" href="/installation">
+    Install via npm, yarn, pnpm, or CDN. Set up browser, Node.js, or mini-program environments.
+  </Card>
+  <Card title="Chart Types" icon="chart-bar" href="/charts/cartesian">
+    Explore all 25+ supported chart types with spec examples and configuration options.
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/vchart-class">
+    Full reference for the VChart constructor, instance methods, static utilities, and events.
+  </Card>
+</CardGroup>
+
+## Key Features
+
+<AccordionGroup>
+  <Accordion title="Declarative Spec API" icon="file-code" defaultOpen>
+    Every chart is defined as a plain JavaScript object called a **spec**. There are no imperative drawing calls. You set `type`, `data`, field mappings, and optional component configs, then call `renderAsync()`. To change the chart, update the spec and call `updateSpec()` — VChart diffs the change and re-renders only what changed.
+
+    ```typescript
+    const spec = {
+      type: 'bar',
+      data: [{ id: 'sales', values: [{ month: 'Jan', revenue: 4200 }] }],
+      xField: 'month',
+      yField: 'revenue'
+    };
+    ```
+  </Accordion>
+
+  <Accordion title="25+ Chart Types" icon="shapes">
+    The default bundle (`vchart-all`) registers over 25 chart types out of the box, covering the full range from basic statistical charts to advanced hierarchical and relational visualisations.
+
+    | Category | Chart Types |
+    |---|---|
+    | Cartesian | Bar, Line, Area, Scatter, Histogram, Waterfall, Range Column, Range Area, Heatmap |
+    | Polar | Rose, Radar, Gauge, Circular Progress, Linear Progress |
+    | Hierarchical | Treemap, Sunburst, Circle Packing |
+    | Relational | Sankey, Correlation, Funnel |
+    | Other | Pie/Donut, Word Cloud, Box Plot, Sequence, Map |
+  </Accordion>
+
+  <Accordion title="Cross-Platform" icon="globe">
+    VChart ships dedicated environment adapters for every major JavaScript runtime. Call the matching `register*Env()` function once before rendering, and the library handles all platform-specific canvas, event, and context differences automatically.
+
+    - **Browser** — `registerBrowserEnv()`
+    - **Node.js** — `registerNodeEnv()` (headless canvas via `node-canvas`)
+    - **WeChat Mini-Program** — `registerWXEnv()`
+    - **Feishu / Lark** — `registerLarkEnv()`
+    - **Taro** — `registerTaroEnv()`
+    - **ByteDance TT Mini-Program** — `registerTTEnv()`
+    - **Harmony OS** — `registerHarmonyEnv()`
+    - **Lynx** — `registerLynxEnv()`
+  </Accordion>
+
+  <Accordion title="Animation System" icon="film">
+    VChart has a first-class animation engine. Every chart type ships with built-in enter, update, and exit animations that can be enabled with a single `animation: true` flag. You can also define custom animation sequences, control playback, and build data-driven narrative flows using the Player component.
+  </Accordion>
+
+  <Accordion title="Theming" icon="palette">
+    Themes are applied at the `ThemeManager` level and automatically cascade to every chart instance. You can register a named theme once and then reference it by name in each chart's `IInitOption` or inline inside the spec's `theme` field. Full tokens — colors, typography, padding, component styles — are configurable.
+  </Accordion>
+
+  <Accordion title="Tree-Shakable Architecture" icon="scissors">
+    The default `import VChart from '@visactor/vchart'` import includes every chart type, component, and plugin. For production bundles you can import the bare `VChart` core and register only what you use via `VChart.useRegisters([...])`. This can dramatically reduce bundle size when only a subset of chart types are needed.
+
+    ```typescript
+    import { VChart } from '@visactor/vchart';
+    import { registerBarChart } from '@visactor/vchart';
+    import { registerBrowserEnv } from '@visactor/vchart';
+
+    VChart.useRegisters([registerBarChart]);
+    registerBrowserEnv();
+    ```
+  </Accordion>
+
+  <Accordion title="Rich Interactions" icon="hand-pointer">
+    Built-in interactions include hover highlighting, click selection, legend-driven filtering, crosshair probing, data zoom, scroll bar, and brush selection — all configured declaratively in the spec. The interaction system is extensible: you can register custom interaction handlers through the same `useRegisters` pipeline.
+  </Accordion>
+
+  <Accordion title="Framework Wrappers" icon="react">
+    Official wrappers are available for React (`@visactor/react-vchart`), Taro (`@visactor/taro-vchart`), Lark (`@visactor/lark-vchart`), and WeChat Mini-Programs (`@visactor/wx-vchart`). Each wrapper exposes chart types as components with prop-based spec binding and lifecycle management.
+  </Accordion>
+</AccordionGroup>
+
+## The VisActor Ecosystem
+
+VChart is one of several libraries published under the VisActor organisation. You'll encounter references to these sibling packages in the source code and configuration:
+
+| Package | Role |
+|---|---|
+| `@visactor/vrender` | GPU-accelerated canvas renderer |
+| `@visactor/vrender-components` | Low-level chart component primitives |
+| `@visactor/vgrammar` | Grammar-of-graphics engine |
+| `@visactor/vdataset` | Data pipeline (transforms, parsing) |
+| `@visactor/vscale` | Scale utilities (band, linear, log, etc.) |
+| `@visactor/vlayouts` | Layout algorithms |
+| `@visactor/vutils` | Shared utility functions |
+
+<Note>
+  VChart is MIT licensed. The source code and all packages live in the monorepo at [github.com/VisActor/VChart](https://github.com/VisActor/VChart).
+</Note>

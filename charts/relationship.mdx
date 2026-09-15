@@ -1,0 +1,317 @@
+---
+title: "Relationship Charts: Sankey, Word Cloud, Correlation"
+sidebarTitle: "Relationship"
+description: "VChart relationship chart types — sankey, wordCloud, correlation, venn, and sequence — with data formats, spec fields, and code examples."
+---
+
+Relationship charts visualize connections, flows, co-occurrences, and associations between entities rather than simple quantities. VChart provides five chart types in this family: the Sankey diagram for directional flows, the word cloud for frequency and prominence of text tokens, the correlation chart for pairwise relationships, the Venn diagram for set overlaps, and the sequence chart for event-driven timelines. Each chart type uses a distinct data structure tailored to the nature of the relationship it encodes.
+
+## Registering Relationship Charts
+
+```ts
+import {
+  registerSankeyChart,
+  registerWordCloudChart,
+  registerCorrelationChart,
+  registerVennChart,
+  registerSequenceChart
+} from '@visactor/vchart';
+
+registerSankeyChart();
+registerWordCloudChart();
+registerCorrelationChart();
+registerVennChart();
+registerSequenceChart();
+```
+
+## Chart Types
+
+<AccordionGroup>
+
+<Accordion title="Sankey Diagram — type: 'sankey'">
+
+Sankey diagrams visualize directional flows between nodes arranged in a layered layout. The width of each link is proportional to the flow volume it represents, making it easy to trace how quantities are distributed, transformed, or lost across a process.
+
+**Data Format**
+
+Sankey data contains two arrays at the top level — `nodes` listing each unique entity, and `links` listing directed edges:
+
+```json
+{
+  "nodes": [
+    { "name": "Source A" },
+    { "name": "Source B" },
+    { "name": "Process X" },
+    { "name": "Output 1" }
+  ],
+  "links": [
+    { "source": "Source A", "target": "Process X", "value": 120 },
+    { "source": "Source B", "target": "Process X", "value": 80 },
+    { "source": "Process X", "target": "Output 1",  "value": 200 }
+  ]
+}
+```
+
+**Key spec fields**
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | `'sankey'` | Chart type identifier |
+| `categoryField` | `string` | Node name field |
+| `valueField` | `string` | Link weight / flow field |
+| `sourceField` | `string` | Link source node field |
+| `targetField` | `string` | Link target node field |
+| `direction` | `'horizontal' \| 'vertical'` | Flow direction |
+| `nodeAlign` | `string` | Node column alignment: `'left'`, `'right'`, `'center'`, `'justify'` |
+| `nodeWidth` | `string \| number` | Node bar width (px or `'12%'`) |
+| `nodeGap` | `number` | Vertical gap between nodes in the same column |
+
+```ts
+import VChart from '@visactor/vchart';
+import { registerSankeyChart } from '@visactor/vchart';
+
+registerSankeyChart();
+
+const spec = {
+  type: 'sankey',
+  data: {
+    values: [
+      {
+        nodes: [
+          { name: 'Organic Search' },
+          { name: 'Paid Search' },
+          { name: 'Social Media' },
+          { name: 'Visitors' },
+          { name: 'Leads' },
+          { name: 'Customers' }
+        ],
+        links: [
+          { source: 'Organic Search', target: 'Visitors',  value: 3200 },
+          { source: 'Paid Search',    target: 'Visitors',  value: 1800 },
+          { source: 'Social Media',   target: 'Visitors',  value: 900  },
+          { source: 'Visitors',       target: 'Leads',     value: 1400 },
+          { source: 'Visitors',       target: 'Customers', value: 320  }
+        ]
+      }
+    ]
+  },
+  categoryField: 'name',
+  valueField: 'value',
+  sourceField: 'source',
+  targetField: 'target',
+  nodeAlign: 'justify',
+  nodeWidth: 20,
+  nodeGap: 8,
+  label: { visible: true }
+};
+
+const chart = new VChart(spec, { dom: 'chart-container' });
+chart.renderSync();
+```
+
+<Note>
+  When your data is already in hierarchical (parent–child) format instead of flat node + link arrays, you can omit `sourceField` and `targetField`. VChart will infer the links from the `children` property of each node object.
+</Note>
+
+</Accordion>
+
+<Accordion title="Word Cloud — type: 'wordCloud'">
+
+Word clouds display text tokens sized proportionally to their frequency or importance, arranged to fill the available canvas. VChart's word cloud supports custom color scales, shaped layouts (fill a silhouette path), and progressive rendering for large vocabularies.
+
+**Key spec fields**
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | `'wordCloud'` | Chart type identifier |
+| `nameField` | `string` | Text token field |
+| `valueField` | `string` | Token weight / frequency field |
+| `fontFamilyField` | `string` | Optional per-token font family field |
+| `fontWeightField` | `string` | Optional per-token font weight field |
+| `wordCloudConfig` | `object` | Layout mode, overlap handling, zoom-to-fit |
+
+```ts
+import { registerWordCloudChart } from '@visactor/vchart';
+
+registerWordCloudChart();
+
+const spec = {
+  type: 'wordCloud',
+  data: {
+    values: [
+      { word: 'JavaScript', count: 420 },
+      { word: 'TypeScript', count: 310 },
+      { word: 'React',      count: 280 },
+      { word: 'Vue',        count: 195 },
+      { word: 'Node.js',    count: 175 },
+      { word: 'Python',     count: 160 },
+      { word: 'Rust',       count: 90  },
+      { word: 'Go',         count: 80  }
+    ]
+  },
+  nameField: 'word',
+  valueField: 'count',
+  fontWeightField: 'count',
+  wordCloudConfig: {
+    zoomToFit: { shrink: true, fontSizeLimitMin: 8 }
+  }
+};
+```
+
+<Tip>
+  For mini-program environments where canvas pixel-level APIs are limited, set `wordCloudConfig.layoutMode: 'fast'` to use a grid-based layout algorithm that avoids pixel-map collision detection.
+</Tip>
+
+</Accordion>
+
+<Accordion title="Correlation Chart — type: 'correlation'">
+
+Correlation charts arrange data points in a circular layout where the radial distance and position of each point encodes its relationship strength to a central reference entity. Ripple animations can be added to draw attention to high-correlation points.
+
+**Key spec fields**
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | `'correlation'` | Chart type identifier |
+| `categoryField` | `string` | Node label field |
+| `valueField` | `string` | Correlation value field |
+| `sizeField` | `string` | Optional node size field |
+| `sizeRange` | `number[]` | `[min, max]` symbol size range in px |
+| `innerRadius` | `string \| number` | Inner distribution radius |
+| `outerRadius` | `string \| number` | Outer distribution radius |
+| `startAngle` | `number` | Distribution start angle |
+| `endAngle` | `number` | Distribution end angle |
+
+```ts
+import { registerCorrelationChart } from '@visactor/vchart';
+
+registerCorrelationChart();
+
+const spec = {
+  type: 'correlation',
+  data: {
+    values: [
+      { item: 'Inflation',    correlation: 0.91, size: 60 },
+      { item: 'Interest Rate',correlation: 0.78, size: 45 },
+      { item: 'GDP Growth',   correlation: 0.55, size: 38 },
+      { item: 'Unemployment', correlation: 0.42, size: 30 },
+      { item: 'Trade Balance',correlation: 0.20, size: 22 }
+    ]
+  },
+  categoryField: 'item',
+  valueField: 'correlation',
+  sizeField: 'size',
+  sizeRange: [12, 48],
+  innerRadius: '20%',
+  outerRadius: '80%'
+};
+```
+
+</Accordion>
+
+<Accordion title="Venn Diagram — type: 'venn'">
+
+Venn diagrams represent sets as overlapping circles where the overlap area encodes the intersection size. VChart supports two- and three-circle Venn layouts, with separate label configurations for the circle regions and the overlap regions.
+
+**Key spec fields**
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | `'venn'` | Chart type identifier |
+| `categoryField` | `string` | Set name field |
+| `valueField` | `string` | Set size / intersection weight field |
+
+**Data format** — each row is either a single set or an intersection. Intersections are indicated by a `sets` array listing the overlapping set names:
+
+```ts
+import { registerVennChart } from '@visactor/vchart';
+
+registerVennChart();
+
+const spec = {
+  type: 'venn',
+  data: {
+    values: [
+      { sets: ['Backend'],             value: 120 },
+      { sets: ['Frontend'],            value: 100 },
+      { sets: ['DevOps'],              value: 80  },
+      { sets: ['Backend', 'Frontend'], value: 40  },
+      { sets: ['Backend', 'DevOps'],   value: 30  },
+      { sets: ['Frontend', 'DevOps'],  value: 20  },
+      { sets: ['Backend', 'Frontend', 'DevOps'], value: 10 }
+    ]
+  },
+  categoryField: 'sets',
+  valueField: 'value'
+};
+```
+
+</Accordion>
+
+<Accordion title="Sequence Chart — type: 'sequence'">
+
+Sequence charts display event streams along a shared time axis. Each row represents an independent track (such as a user session or sensor channel), and events are rendered as dots or bars on that track. Linked events between tracks can be drawn as arcs or paths connecting corresponding moments.
+
+**Key spec fields**
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | `'sequence'` | Chart type identifier |
+| `axes` | `array` | Cartesian axis configurations (typically a time x-axis) |
+| `appendPadding` | `object` | Extra left padding to reserve space for track labels |
+| `region` | `array` | One region spec per track row |
+| `series` | `array` | Mixed dot / link / bar series in the sequence |
+
+```ts
+import { registerSequenceChart } from '@visactor/vchart';
+
+registerSequenceChart();
+
+const spec = {
+  type: 'sequence',
+  appendPadding: { left: 80 },
+  axes: [
+    {
+      orient: 'bottom',
+      type: 'time',
+      range: { min: 1680000000000, max: 1680086400000 }
+    }
+  ],
+  series: [
+    {
+      type: 'dot',
+      dataId: 'events',
+      xField: 'timestamp',
+      yField: 'track',
+      seriesField: 'eventType',
+      dotTypeField: 'eventType',
+      height: 30
+    }
+  ]
+};
+```
+
+<Note>
+  The sequence chart is designed for event-timeline visualizations. Each series inside the chart spec must reference a named `dataId`. Provide the associated data via `VChart.updateData()` or inline in the top-level `data` array with matching `id` values.
+</Note>
+
+</Accordion>
+
+</AccordionGroup>
+
+## Choosing the Right Chart
+
+<CardGroup cols={2}>
+  <Card title="Sankey" icon="shuffle">
+    Use when you need to trace flows or transformations with quantified volumes — supply chains, traffic funnels, energy budgets, or financial distributions.
+  </Card>
+  <Card title="Word Cloud" icon="cloud">
+    Use when comparing text token frequencies or keyword importance. Works best when the corpus spans at least 20–30 distinct terms.
+  </Card>
+  <Card title="Correlation" icon="circle-nodes">
+    Use for radial comparison of multiple entities against a central concept — survey responses, competitive benchmarks, or similarity scores.
+  </Card>
+  <Card title="Venn" icon="circle-half-stroke">
+    Use when showing set membership and overlaps — audience segments, feature commonalities, or diagnostic criteria intersections.
+  </Card>
+</CardGroup>

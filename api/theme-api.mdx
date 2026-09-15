@@ -1,0 +1,437 @@
+---
+title: "VChart Theme API: Register, Apply and Manage Themes"
+sidebarTitle: "Theme API"
+description: "Complete reference for VChart's theme system: registering custom themes, applying them per-instance or globally, and the full ITheme structure."
+---
+
+VChart ships a fully composable theme system built around the `ThemeManager` static class and per-instance methods. A **theme** is a plain JavaScript object (`ITheme`) that controls every visual aspect of a chart — background colour, global font, the data colour palette, semantic palette tokens, mark-level style defaults, series-specific overrides, and component-level configuration. Themes can be registered once and then applied by name to any number of instances, switched at runtime without rebuilding the chart, or inlined directly into a spec or the `IInitOption` constructor argument. The priority chain is always: **spec `theme` field > `IInitOption.theme` > instance `setCurrentTheme` > `ThemeManager.setCurrentTheme`**.
+
+---
+
+## Built-in Themes
+
+VChart registers one built-in theme out of the box:
+
+| Name | Description |
+|---|---|
+| `'light'` | Default light theme. Used when no theme is specified. |
+
+A `'dark'` theme object is exported from the package and can be registered on demand (see the registration example below). Third-party theme packages can register any number of additional themes.
+
+---
+
+## Instance Methods
+
+### `setCurrentTheme(name)`
+
+**Asynchronous.** Switches the active theme for this VChart instance. The chart is re-rendered to reflect the new theme. The theme must have been registered with `ThemeManager.registerTheme` (or be the built-in `'light'` theme) before calling this method.
+
+<Note>
+If the spec contains a `theme` field, that field has higher priority than the name passed to `setCurrentTheme`. Remove or clear `spec.theme` before calling this method if you want the new theme to fully apply.
+</Note>
+
+<ParamField path="name" type="string" required>
+  The registered theme name to activate (e.g. `'light'`, `'dark'`, `'myBrand'`).
+</ParamField>
+
+**Returns:** `Promise<IVChart>`
+
+```ts
+await chart.setCurrentTheme('dark');
+```
+
+### `setCurrentThemeSync(name)`
+
+**Synchronous** equivalent of `setCurrentTheme`. Re-renders the chart synchronously.
+
+<ParamField path="name" type="string" required>
+  The registered theme name to activate.
+</ParamField>
+
+**Returns:** `IVChart`
+
+```ts
+chart.setCurrentThemeSync('myBrand');
+```
+
+### `getCurrentTheme()`
+
+Returns the **complete, merged** `ITheme` object that is currently active on this instance. This is the resolved theme after all merge logic (option theme, spec theme, current theme name) has been applied.
+
+**Returns:** `ITheme`
+
+### `getCurrentThemeName()`
+
+Returns the name string of the currently active theme. Reflects only themes set via `setCurrentTheme` — defaults to the name set by `ThemeManager`.
+
+**Returns:** `string`
+
+---
+
+## ThemeManager Static API
+
+`VChart.ThemeManager` is the global theme registry shared across all VChart instances. Use it to register, inspect, and switch themes application-wide.
+
+### `VChart.ThemeManager.registerTheme(name, theme)`
+
+Registers a new theme or overwrites an existing one by name. After registration, any instance can activate it by name.
+
+<ParamField path="name" type="string" required>
+  Unique theme identifier string. Avoid generic names like `'default'` — prefer descriptive names such as `'brandLight'` or `'darkHighContrast'`.
+</ParamField>
+
+<ParamField path="theme" type="Partial<ITheme>" required>
+  The theme configuration object. Only the fields you provide are applied — VChart deep-merges your theme on top of the base light or dark theme (controlled by `theme.type`). See [ITheme Structure](#itheme-structure) below.
+</ParamField>
+
+```ts
+import VChart from '@visactor/vchart';
+
+VChart.ThemeManager.registerTheme('brandDark', {
+  type: 'dark',
+  background: '#1a1a2e',
+  fontFamily: 'Inter, sans-serif',
+  colorScheme: {
+    default: ['#e94560', '#0f3460', '#533483', '#16213e']
+  }
+});
+```
+
+### `VChart.ThemeManager.getTheme(name?)`
+
+Returns the raw (unprocessed) `ITheme` object for the given theme name.
+
+<ParamField path="name" type="string">
+  The theme name to look up. Defaults to the current theme name when omitted.
+</ParamField>
+
+**Returns:** `ITheme`
+
+### `VChart.ThemeManager.removeTheme(name)`
+
+Removes a previously registered theme from the global registry. Returns `true` if the theme was found and removed, `false` otherwise.
+
+<ParamField path="name" type="string" required>
+  The theme name to remove.
+</ParamField>
+
+**Returns:** `boolean`
+
+### `VChart.ThemeManager.themeExist(name)`
+
+Checks whether a theme with the given name is registered.
+
+<ParamField path="name" type="string" required>
+  The theme name to test.
+</ParamField>
+
+**Returns:** `boolean`
+
+### `VChart.ThemeManager.getCurrentThemeName()`
+
+Returns the name of the globally active theme — the name that new instances will use by default when no instance-level override is in place.
+
+**Returns:** `string`
+
+### `VChart.ThemeManager.setCurrentTheme(name)` *(global)*
+
+Sets the active theme for **all existing VChart instances** simultaneously and also sets the default for new instances. Internally calls `instance.setCurrentTheme(name)` on every registered instance.
+
+<ParamField path="name" type="string" required>
+  The theme name to activate globally.
+</ParamField>
+
+```ts
+// Switch every chart on the page to dark mode
+VChart.ThemeManager.setCurrentTheme('dark');
+```
+
+---
+
+## ITheme Structure
+
+The `ITheme` interface is organised into seven conceptual layers. You only need to supply the layers relevant to your customisation — everything else falls back to the base theme.
+
+```ts
+interface ITheme {
+  // Layer 1 — identity
+  name?: string;
+  description?: string;
+  type?: 'light' | 'dark'; // base theme to merge onto
+
+  // Layer 2 — chart-level visual properties
+  background?: IColor | IColorKey;
+  padding?: ILayoutPaddingSpec;
+  fontFamily?: string | ITokenKey;
+  token?: TokenMap;          // semantic design tokens
+
+  // Layer 3 — colour palette
+  colorScheme?: IThemeColorScheme;
+
+  // Layer 4 — global mark style defaults
+  mark?: IGlobalMarkThemeByType;     // keyed by mark type
+  markByName?: IGlobalMarkThemeByName; // keyed by mark name (higher priority)
+
+  // Layer 5 — series-level style overrides
+  series?: ISeriesTheme;
+
+  // Layer 6 — component-level style overrides
+  component?: IComponentTheme;
+
+  // Layer 7 — per-chart-type overrides
+  chart?: Record<ChartType, Omit<ITheme, 'name' | 'type' | 'description'>>;
+}
+```
+
+<Accordion title="Layer 1 — Identity">
+| Field | Type | Description |
+|---|---|---|
+| `name` | `string` | Theme identifier (set automatically by `registerTheme`). |
+| `description` | `string` | Human-readable theme description. |
+| `type` | `'light' \| 'dark'` | Controls which built-in base theme your theme merges onto. Defaults to `'light'`. |
+</Accordion>
+
+<Accordion title="Layer 2 — Chart-level properties">
+| Field | Type | Description |
+|---|---|---|
+| `background` | `IColor \| IColorKey` | Chart background colour. Can be a hex string, an rgba string, a gradient, or a semantic `palette` key reference. |
+| `padding` | `ILayoutPaddingSpec` | Default chart padding (number or `{ top, right, bottom, left }`). |
+| `fontFamily` | `string \| ITokenKey` | Default font family applied to all text marks. |
+| `token` | `TokenMap` | Map of semantic design tokens (e.g. `fontFamily`, `colorPrimary`) that can be referenced elsewhere in the theme via `ITokenKey`. **Since 1.10.0.** |
+</Accordion>
+
+<Accordion title="Layer 3 — Colour palette (colorScheme)">
+`colorScheme` is an `IThemeColorScheme` object. It must contain a `default` colour scheme and can optionally include per-series-type overrides.
+
+```ts
+type IThemeColorScheme = {
+  default: ColorScheme;   // required fallback palette
+  [SeriesType]: ColorScheme; // optional per-series overrides
+};
+
+// ColorScheme is one of:
+type ColorScheme =
+  | string[]                    // simple array of colour strings
+  | ProgressiveDataScheme<string> // adaptive palette by domain size
+  | IColorSchemeStruct;         // object with dataScheme + semantic palette
+```
+
+`IColorSchemeStruct` lets you define both a **data palette** (the ordered colours assigned to series) and a **semantic palette** (named colours like `bandColor`, `backgroundColor`, `labelFontColor` that other theme fields can reference by key).
+
+```ts
+colorScheme: {
+  default: {
+    dataScheme: ['#e94560', '#0f3460', '#533483', '#16213e'],
+    palette: {
+      backgroundColor: '#1a1a2e',
+      bandColor: '#e94560',
+      labelFontColor: '#ffffff'
+    }
+  }
+}
+```
+</Accordion>
+
+<Accordion title="Layer 4 — Global mark defaults">
+Override the default visual style for every mark of a given type or name across all series.
+
+```ts
+// By mark type (lower priority)
+mark: {
+  rect:   { style: { cornerRadius: 4 } },
+  symbol: { style: { size: 8 } },
+  text:   { style: { fontSize: 12 } }
+}
+
+// By mark name (higher priority — overrides mark-type defaults)
+markByName: {
+  bar:   { style: { cornerRadius: [4, 4, 0, 0] } },
+  point: { style: { size: 6, strokeWidth: 1.5 } },
+  label: { style: { fontWeight: 'bold' } }
+}
+```
+</Accordion>
+
+<Accordion title="Layer 5 — Series overrides (series)">
+Target style overrides at specific series types. Each key is a series type string and its value follows the series-specific theme interface.
+
+```ts
+series: {
+  line: {
+    line:   { style: { lineWidth: 2 } },
+    point:  { style: { size: 6 } }
+  },
+  bar: {
+    bar: { style: { cornerRadius: 4 } }
+  }
+}
+```
+</Accordion>
+
+<Accordion title="Layer 6 — Component overrides (component)">
+Style any built-in component: axes, legend, tooltip, crosshair, dataZoom, title, and more.
+
+```ts
+component: {
+  axis: {
+    left: {
+      label: { style: { fill: '#888' } },
+      grid:  { style: { stroke: '#eee' } }
+    }
+  },
+  legend: {
+    discrete: {
+      item: { label: { style: { fill: '#333', fontSize: 13 } } }
+    }
+  }
+}
+```
+</Accordion>
+
+<Accordion title="Layer 7 — Per-chart-type overrides (chart)">
+Apply a sub-theme only when the chart `type` matches. This is how VChart handles, e.g., pie charts needing different padding than bar charts.
+
+```ts
+chart: {
+  pie: {
+    padding: { top: 40 }
+  },
+  bar: {
+    mark: {
+      rect: { style: { cornerRadius: 4 } }
+    }
+  }
+}
+```
+</Accordion>
+
+---
+
+## `defaultTheme` in `IInitOption`
+
+You can supply an instance-specific default theme at construction time without needing to set it globally on `ThemeManager`. This is ideal when multiple charts on the same page should use different themes.
+
+<ParamField path="theme" type="string | ITheme">
+  A registered theme name string, or an inline `ITheme` object to apply only to this instance. When an inline object is provided it is merged on top of the base theme. This option has lower priority than a `theme` field inside the spec itself.
+</ParamField>
+
+```ts
+// Apply a named theme to one instance only
+const chart = new VChart(spec, {
+  dom: 'container',
+  theme: 'brandDark'
+});
+chart.renderSync();
+```
+
+---
+
+## End-to-End Custom Theme Example
+
+The following example shows the full flow: register a custom brand theme, apply it to a new instance, and switch the global theme at runtime.
+
+<Steps>
+  <Step title="Register your custom theme">
+    Call `VChart.ThemeManager.registerTheme` **once** before creating any instance that uses it. A good place is your application's initialisation module.
+
+    ```ts
+    import VChart from '@visactor/vchart';
+
+    VChart.ThemeManager.registerTheme('acme', {
+      type: 'light',
+      background: '#f8f9fa',
+      fontFamily: 'Roboto, sans-serif',
+      colorScheme: {
+        default: ['#2563eb', '#16a34a', '#dc2626', '#d97706', '#7c3aed']
+      },
+      markByName: {
+        bar:   { style: { cornerRadius: [4, 4, 0, 0] } },
+        label: { style: { fontSize: 13, fontWeight: '600' } }
+      },
+      component: {
+        axis: {
+          bottom: { tick: { style: { stroke: '#d1d5db' } } }
+        }
+      }
+    });
+    ```
+  </Step>
+
+  <Step title="Apply the theme to a new instance">
+    Pass the theme name in `IInitOption` or set it after construction.
+
+    ```ts
+    const chart = new VChart(
+      {
+        type: 'bar',
+        data: [{ id: 'revenue', values: [
+          { quarter: 'Q1', value: 3200 },
+          { quarter: 'Q2', value: 4100 },
+          { quarter: 'Q3', value: 5800 },
+          { quarter: 'Q4', value: 4900 }
+        ]}],
+        xField: 'quarter',
+        yField: 'value'
+      },
+      {
+        dom: 'chart-container',
+        theme: 'acme'     // ← apply by name at construction time
+      }
+    );
+
+    chart.renderSync();
+    ```
+  </Step>
+
+  <Step title="Switch themes at runtime">
+    Toggle between themes in response to user preference changes (e.g. dark mode).
+
+    ```ts
+    // Switch this instance only
+    chart.setCurrentThemeSync('dark');
+
+    // Or register and switch all instances globally
+    import { darkTheme } from '@visactor/vchart';
+    VChart.ThemeManager.registerTheme(darkTheme.name, darkTheme);
+    VChart.ThemeManager.setCurrentTheme('dark');
+    ```
+  </Step>
+
+  <Step title="Inline theme in the spec">
+    For one-off overrides that don't need a registry entry, embed a partial `ITheme` directly inside the spec. This has the highest priority.
+
+    ```ts
+    const spec = {
+      type: 'line',
+      theme: {
+        background: '#0d1117',
+        colorScheme: {
+          default: ['#58a6ff', '#3fb950', '#f78166']
+        }
+      },
+      // ... rest of spec
+    };
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Priority Summary
+
+When multiple theme sources are present at once, VChart resolves them in this order (highest to lowest):
+
+<CardGroup cols={1}>
+  <Card title="1. spec.theme (highest)" icon="file-code">
+    An inline `ITheme` object or registered theme name embedded inside the spec object itself. Always wins.
+  </Card>
+  <Card title="2. IInitOption.theme" icon="gear">
+    The `theme` field passed to the `new VChart(spec, options)` constructor. Applies to this instance only.
+  </Card>
+  <Card title="3. instance.setCurrentTheme()" icon="user">
+    Theme activated on a specific instance via the `setCurrentTheme` / `setCurrentThemeSync` instance method.
+  </Card>
+  <Card title="4. ThemeManager.setCurrentTheme() (lowest)" icon="globe">
+    The globally active theme set on `VChart.ThemeManager`. Acts as the default for all instances when no higher-priority override exists.
+  </Card>
+</CardGroup>

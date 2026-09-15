@@ -1,0 +1,391 @@
+---
+title: "Running VChart Across Platforms and Environments"
+sidebarTitle: "Cross-Platform"
+description: "Deploy VChart in browser, Node.js, WeChat Mini Program, Lark, Taro, Harmony, Lynx, and ByteDance mini-app environments with the correct env registration."
+---
+
+VChart separates its rendering engine from the host environment through a modular environment registration system. Before creating a chart instance you call one of the `register*Env()` functions to load the correct canvas and event drivers for your target platform. This design means the same chart specification works identically across a standard web browser, a server-side Node.js process, and half a dozen mini-program runtimes — you only swap the env registration call and (for non-browser targets) the mounting mechanism.
+
+## How Environment Registration Works
+
+All env registration helpers are exported from `@visactor/vchart` and delegate to the underlying `@visactor/vrender-kits` env loaders. Calling a registration function injects the appropriate canvas implementation and event system into the shared VRender container:
+
+```ts
+import {
+  registerBrowserEnv,
+  registerNodeEnv,
+  registerLarkEnv,
+  registerWXEnv,
+  registerTaroEnv,
+  registerLynxEnv,
+  registerHarmonyEnv,
+  registerTTEnv,
+  registerAllEnv   // loads every env at once (larger bundle)
+} from '@visactor/vchart';
+```
+
+<Warning>
+  Call the env registration function **once**, before you create any `VChart` instance. Calling it multiple times is safe but unnecessary. Avoid `registerAllEnv()` in production builds — it adds code for every platform even if you only target one.
+</Warning>
+
+---
+
+<Tabs>
+  <Tab title="Browser">
+
+## Browser
+
+The default target for `@visactor/vchart`. Renders to an HTML `<canvas>` element identified by a DOM id string, a DOM element reference, or an `HTMLCanvasElement`.
+
+```ts
+import { VChart, registerBrowserEnv } from '@visactor/vchart';
+
+// Load the browser canvas + DOM event driver
+registerBrowserEnv();
+
+const spec = {
+  type: 'bar',
+  data: [{ id: 'barData', values: [
+    { category: 'A', value: 30 },
+    { category: 'B', value: 55 },
+    { category: 'C', value: 42 }
+  ]}],
+  xField: 'category',
+  yField: 'value'
+};
+
+// Mount by DOM id string
+const chart = new VChart(spec, { dom: 'my-chart-container' });
+chart.renderSync();
+
+// — or — pass an HTMLDivElement directly
+const container = document.getElementById('my-chart-container');
+const chart2 = new VChart(spec, { dom: container });
+chart2.renderSync();
+```
+
+**Key init options for browser:**
+
+| Option | Type | Description |
+|---|---|---|
+| `dom` | `string \| HTMLElement` | Container element or its id |
+| `autoFit` | `boolean` | Fit canvas to container size (default `false`) |
+| `animation` | `boolean` | Enable animations (default `true`) |
+| `background` | `string` | Canvas background color |
+
+  </Tab>
+  <Tab title="Node.js">
+
+## Node.js
+
+Server-side rendering requires a headless canvas implementation. VChart integrates with `node-canvas` via `registerNodeEnv()`. The chart renders to an off-screen canvas which you can then export as a PNG or JPEG buffer.
+
+```ts
+import { VChart, registerNodeEnv } from '@visactor/vchart';
+import { createCanvas } from 'canvas'; // npm i canvas
+
+// Load the Node.js (headless canvas) driver
+registerNodeEnv();
+
+const canvas = createCanvas(800, 600);
+
+const spec = {
+  type: 'line',
+  data: [{ id: 'lineData', values: [
+    { x: 0, y: 10 },
+    { x: 1, y: 25 },
+    { x: 2, y: 18 }
+  ]}],
+  xField: 'x',
+  yField: 'y',
+  width: 800,
+  height: 600
+};
+
+const chart = new VChart(spec, {
+  renderCanvas: canvas,  // pass the node-canvas instance
+  animation: false       // no animations for static SSR
+});
+
+await chart.renderAsync();
+
+// Export to PNG buffer
+const buffer = canvas.toBuffer('image/png');
+require('fs').writeFileSync('chart.png', buffer);
+chart.release();
+```
+
+<Note>
+  Install peer dependencies for Node.js rendering: `npm install canvas` (the `node-canvas` package). VChart uses the `renderCanvas` option (an `HTMLCanvasElement`-compatible object) rather than `dom` for Node.js.
+</Note>
+
+  </Tab>
+  <Tab title="WeChat Mini Program">
+
+## WeChat Mini Program (`wx-vchart`)
+
+Use the purpose-built wrapper package `@visactor/wx-vchart` which handles the WeChat canvas binding internally.
+
+```bash
+npm install @visactor/wx-vchart
+```
+
+In your mini-program page component:
+
+```xml
+<!-- index.wxml -->
+<view>
+  <wx-vchart
+    id="chartId"
+    canvas-id="chartCanvas"
+    spec="{{ spec }}"
+    bind:chartinit="onChartInit"
+    bind:chartready="onChartReady"
+  />
+</view>
+```
+
+```js
+// index.js
+import VChart from '@visactor/wx-vchart';
+
+Page({
+  data: {
+    spec: {
+      type: 'pie',
+      data: [{ id: 'data', values: [
+        { type: 'A', value: 40 },
+        { type: 'B', value: 35 },
+        { type: 'C', value: 25 }
+      ]}],
+      categoryField: 'type',
+      valueField: 'value'
+    }
+  },
+  onChartInit(instance) {
+    // instance is the IVChart object
+    instance.on('click', params => {
+      console.log('Slice clicked:', params.datum);
+    });
+  }
+});
+```
+
+<Note>
+  The WeChat mini-program environment uses its own canvas API. `@visactor/wx-vchart` wraps `registerWXEnv()` internally — you do not need to call it manually when using the dedicated package.
+</Note>
+
+  </Tab>
+  <Tab title="Lark / Feishu">
+
+## Lark / Feishu Mini App (`lark-vchart`)
+
+Use `@visactor/lark-vchart` for Lark (飞书) mini-apps and Lark Blocks. The `registerLarkEnv()` function loads the Feishu canvas driver:
+
+```bash
+npm install @visactor/lark-vchart
+```
+
+```ts
+// In your Lark app entry
+import { VChart, registerLarkEnv } from '@visactor/lark-vchart';
+
+registerLarkEnv();
+```
+
+For Lark Block usage with the component wrapper:
+
+```xml
+<!-- template.xml -->
+<chart
+  id="chartId"
+  canvas-id="chartCanvas"
+  spec="{{ spec }}"
+  bind:chartinit="onInit"
+  bind:chartready="onReady"
+/>
+```
+
+```js
+import LarkVChart from '@visactor/lark-vchart';
+
+// In your page logic
+Component({
+  data: {
+    spec: {
+      type: 'bar',
+      data: [{ id: 'barData', values: [
+        { name: 'Q1', revenue: 1200 },
+        { name: 'Q2', revenue: 1450 }
+      ]}],
+      xField: 'name',
+      yField: 'revenue'
+    }
+  },
+  methods: {
+    onInit(chart) {
+      // chart is the IVChart instance
+    }
+  }
+});
+```
+
+  </Tab>
+  <Tab title="Taro">
+
+## Taro (`taro-vchart`)
+
+`@visactor/taro-vchart` provides a React component for Taro cross-platform apps (WeChat, Alipay, ByteDance mini-programs, and H5):
+
+```bash
+npm install @visactor/taro-vchart
+```
+
+```tsx
+import React from 'react';
+import { VChart } from '@visactor/taro-vchart';
+
+const spec = {
+  type: 'radar',
+  data: [{ id: 'radar', values: [
+    { key: 'Speed',    value: 80 },
+    { key: 'Strength', value: 60 },
+    { key: 'Agility',  value: 90 }
+  ]}],
+  categoryField: 'key',
+  valueField: 'value'
+};
+
+export const RadarPage: React.FC = () => {
+  return (
+    <VChart
+      type="weapp"   // 'weapp' | 'tt' | 'h5' | 'lark'
+      canvasId="radarChart"
+      spec={spec}
+      style={{ height: '300px', width: '100%' }}
+      onChartReady={instance => {
+        console.log('Chart ready');
+      }}
+    />
+  );
+};
+```
+
+<Note>
+  Set the `type` prop to match your Taro compile target: `'weapp'` for WeChat, `'tt'` for ByteDance, `'h5'` for web, `'lark'` for Lark/Feishu.
+</Note>
+
+  </Tab>
+  <Tab title="Harmony">
+
+## Harmony OS
+
+Register the Harmony environment driver before instantiating charts in ArkTS:
+
+```ts
+import { VChart, registerHarmonyEnv } from '@visactor/vchart';
+
+registerHarmonyEnv();
+
+// Use XComponent canvas in HarmonyOS
+const chart = new VChart(
+  {
+    type: 'line',
+    // ...spec...
+  },
+  {
+    renderCanvas: xComponentContext.getXComponent(), // Harmony XComponent
+    width: 400,
+    height: 300,
+    animation: false
+  }
+);
+
+chart.renderSync();
+```
+
+  </Tab>
+  <Tab title="Lynx">
+
+## Lynx
+
+Lynx is ByteDance's cross-platform UI framework. Register the Lynx env before use:
+
+```ts
+import { VChart, registerLynxEnv } from '@visactor/vchart';
+
+registerLynxEnv();
+
+const chart = new VChart(
+  {
+    type: 'bar',
+    data: [{ id: 'd', values: [
+      { x: 'Jan', y: 120 },
+      { x: 'Feb', y: 95 }
+    ]}],
+    xField: 'x',
+    yField: 'y'
+  },
+  {
+    renderCanvas: lynxCanvas, // Lynx canvas element reference
+    width: 375,
+    height: 250
+  }
+);
+
+chart.renderSync();
+```
+
+  </Tab>
+  <Tab title="ByteDance Mini App">
+
+## ByteDance Mini App (TT)
+
+For ByteDance (抖音/头条) mini-programs, use `registerTTEnv()`:
+
+```ts
+import { VChart, registerTTEnv } from '@visactor/vchart';
+
+registerTTEnv();
+
+// Inside the mini-program page onReady hook:
+Page({
+  onReady() {
+    const query = tt.createSelectorQuery();
+    query.select('#myCanvas')
+      .node(res => {
+        const canvas = res.node;
+        const chart = new VChart(spec, {
+          renderCanvas: canvas,
+          width: 375,
+          height: 300
+        });
+        chart.renderSync();
+      })
+      .exec();
+  }
+});
+```
+
+  </Tab>
+</Tabs>
+
+---
+
+## Environment Registration Reference
+
+| Function | Platform | Package |
+|---|---|---|
+| `registerBrowserEnv()` | Modern browsers | `@visactor/vchart` |
+| `registerNodeEnv()` | Node.js (SSR) | `@visactor/vchart` |
+| `registerWXEnv()` | WeChat Mini Program | `@visactor/vchart` / `@visactor/wx-vchart` |
+| `registerLarkEnv()` | Lark / Feishu mini-app | `@visactor/vchart` / `@visactor/lark-vchart` |
+| `registerTaroEnv()` | Taro (multi-platform) | `@visactor/vchart` / `@visactor/taro-vchart` |
+| `registerTTEnv()` | ByteDance / TikTok mini-app | `@visactor/vchart` |
+| `registerLynxEnv()` | Lynx (ByteDance UI) | `@visactor/vchart` |
+| `registerHarmonyEnv()` | HarmonyOS | `@visactor/vchart` |
+| `registerAllEnv()` | All of the above | `@visactor/vchart` |
+
+<Tip>
+  When using a dedicated wrapper package like `@visactor/wx-vchart`, `@visactor/lark-vchart`, or `@visactor/taro-vchart`, the env registration is handled for you internally. You only need to call the env registration functions directly when using `@visactor/vchart` core in a custom integration.
+</Tip>

@@ -1,0 +1,392 @@
+---
+title: "Legend Spec Configuration Options in VChart"
+sidebarTitle: "Legend Spec"
+description: "Reference for VChart's legends spec: discrete vs continuous types, orient, position, item styles, filtering, pagination, and defaultSelected ranges."
+---
+
+VChart's legend system supports two categories: **discrete legends** for categorical series (the default for most chart types) and **continuous legends** for color or size scales. Both are configured through the `legends` field of the chart spec, which accepts a single legend object or an array of objects. The legend spec is defined in `src/component/legend/interface.ts` and its sub-type files. Every legend type shares a set of common fields (`ILegendCommonSpec`), with type-specific extensions for discrete (`IDiscreteLegendSpec`), color (`IColorLegendSpec`), and size (`ISizeLegendSpec`) variants.
+
+## Discrete Legend Example
+
+```json
+{
+  "legends": [
+    {
+      "type": "discrete",
+      "visible": true,
+      "orient": "bottom",
+      "position": "middle",
+      "layout": "horizontal",
+      "title": {
+        "visible": true,
+        "text": "Categories"
+      },
+      "item": {
+        "shape": { "visible": true, "space": 4 },
+        "label": {
+          "style": { "fontSize": 12, "fill": "#333" }
+        }
+      },
+      "filter": true,
+      "defaultSelected": ["Series A", "Series B"],
+      "maxRow": 2
+    }
+  ]
+}
+```
+
+## Continuous (Color) Legend Example
+
+```json
+{
+  "legends": [
+    {
+      "type": "color",
+      "field": "temperature",
+      "scale": "colorScale",
+      "visible": true,
+      "orient": "right",
+      "title": { "visible": true, "text": "Temp (°C)" },
+      "startText": { "visible": true, "text": "Low" },
+      "endText": { "visible": true, "text": "High" },
+      "slidable": true,
+      "defaultSelected": [20, 80]
+    }
+  ]
+}
+```
+
+## Common Legend Fields (`ILegendCommonSpec`)
+
+These fields apply to every legend type.
+
+<ParamField path="visible" type="boolean" default="true">
+  Whether to render the legend component. Setting `false` hides the legend but
+  it still participates in layout (taking up space). To fully remove it, omit
+  the legend config entirely.
+</ParamField>
+
+<ParamField path="orient" type="'top' | 'bottom' | 'left' | 'right'" default="'left'">
+  The position of the legend relative to the chart region. Controls both the
+  default layout direction and the legend's anchor point. When `orient` is
+  `"top"` or `"bottom"`, the legend defaults to horizontal layout. When `"left"`
+  or `"right"`, it defaults to vertical layout.
+</ParamField>
+
+<ParamField path="position" type="'start' | 'middle' | 'end'" default="'middle'">
+  The alignment of the legend within its oriented slot:
+  - For `orient: "top"` / `"bottom"` — aligns the legend horizontally (`start` = left, `end` = right)
+  - For `orient: "left"` / `"right"` — aligns the legend vertically (`start` = top, `end` = bottom)
+</ParamField>
+
+<ParamField path="layout" type="'horizontal' | 'vertical'">
+  Forces the internal layout direction of legend items, overriding the default
+  derived from `orient`. Use `"horizontal"` to wrap items in rows, `"vertical"`
+  for a column.
+</ParamField>
+
+<ParamField path="padding" type="number | number[] | { top; right; bottom; left }">
+  External padding around the entire legend component — the space between the
+  legend and adjacent chart elements. This is distinct from `background.padding`
+  which is internal.
+</ParamField>
+
+<ParamField path="filter" type="boolean" default="true">
+  When `true`, clicking a legend item toggles the visibility of the
+  corresponding series data. Set to `false` to create a display-only legend with
+  no interactive filtering.
+</ParamField>
+
+<ParamField path="customFilter" type="function">
+  A custom filtering function `(data, selectedRange, datumField) => filteredData`
+  that overrides the built-in filter logic. Available since v1.13.1.
+</ParamField>
+
+<ParamField path="interactive" type="boolean" default="true">
+  Enables or disables all legend interactions (hover, click). When `false`, the
+  legend is purely decorative.
+</ParamField>
+
+<ParamField path="title" type="ITitle">
+  Legend title configuration.
+
+  ```json
+  {
+    "title": {
+      "visible": true,
+      "text": "Series",
+      "space": 12,
+      "textStyle": { "fontSize": 14, "fontWeight": "bold", "fill": "#333" },
+      "shape": { "visible": false }
+    }
+  }
+  ```
+
+  Key sub-fields:
+  - `visible` — whether to render the title
+  - `text` — title string
+  - `textStyle` — `ITextMarkSpec` style (without `visible`)
+  - `space` — gap between the title and the item area
+  - `shape` — optional leading symbol in the title
+  - `background` — optional background panel behind the title
+</ParamField>
+
+<ParamField path="background" type="object">
+  A background panel behind the entire legend.
+
+  ```json
+  {
+    "background": {
+      "visible": true,
+      "padding": 8,
+      "style": { "fill": "#fff", "stroke": "#eee", "cornerRadius": 4 }
+    }
+  }
+  ```
+</ParamField>
+
+## Discrete Legend Fields (`IDiscreteLegendSpec`)
+
+<ParamField path="type" type="'discrete'" default="'discrete'">
+  Declares this as a discrete legend (the default when `type` is omitted). Each
+  item represents one unique value from the series field.
+</ParamField>
+
+<ParamField path="item" type="IItem">
+  Configuration for each individual legend item — the icon, label text, and
+  value text.
+
+  ```json
+  {
+    "item": {
+      "align": "left",
+      "shape": {
+        "visible": true,
+        "space": 6,
+        "style": { "symbolType": "circle", "size": 10 }
+      },
+      "label": {
+        "style": { "fontSize": 12, "fill": "#333" },
+        "formatter": "{value}"
+      },
+      "value": {
+        "visible": false
+      },
+      "maxWidth": 120,
+      "width": 100
+    }
+  }
+  ```
+
+  Key `IItem` sub-fields:
+  - `align` — `"left"` | `"right"` (icon position relative to text, since v1.10.0)
+  - `shape` — the colored icon mark; style accepts a callback per item
+  - `label` — the primary text; supports `formatMethod` and `formatter`
+  - `value` — secondary value text shown next to the label
+  - `width` / `maxWidth` / `height` — fixed or percentage dimensions
+  - `focusIconStyle` — style of the focus (spotlight) button
+  - `autoEllipsisStrategy` — `"labelFirst"` | `"valueFirst"` | `"none"`
+</ParamField>
+
+<ParamField path="defaultSelected" type="string[]">
+  An array of legend item keys that are selected (visible) by default. Items not
+  in this array will be unselected when the chart first renders.
+
+  ```json
+  { "defaultSelected": ["Category A", "Category C"] }
+  ```
+</ParamField>
+
+<ParamField path="maxRow" type="number | function">
+  The maximum number of rows for a horizontal legend before pagination kicks in.
+  Accepts a fixed number or a callback `(ctx) => number` evaluated at layout
+  time with the available rect. Since v2.0.23.
+</ParamField>
+
+<ParamField path="maxCol" type="number | function">
+  The maximum number of columns for a vertical legend before pagination. Mirrors
+  `maxRow` for vertical layouts.
+</ParamField>
+
+<ParamField path="pager" type="IPager | ILegendScrollbar">
+  Pagination or scrollbar configuration for legends with many items.
+
+  ```json
+  {
+    "pager": {
+      "layout": "horizontal",
+      "position": "end",
+      "textStyle": { "fontSize": 11 },
+      "handler": {
+        "space": 8,
+        "preShape": "triangleLeft",
+        "nextShape": "triangleRight"
+      }
+    }
+  }
+  ```
+
+  To use a scroll bar instead of page buttons, set `type: "scrollbar"`:
+
+  ```json
+  {
+    "pager": {
+      "type": "scrollbar",
+      "railStyle": { "fill": "#f0f0f0" },
+      "sliderStyle": { "fill": "#aaa" }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="data" type="function">
+  A callback `(data, colorScale, globalScale) => LegendItemDatum[]` for
+  customizing the legend items array — for example to add value labels or reorder
+  entries — before VChart renders them.
+</ParamField>
+
+<ParamField path="scale" type="string">
+  The `id` of a scale defined in `spec.scales`. Binds this legend to that scale
+  rather than auto-detecting from series data. Available since v1.10.5.
+</ParamField>
+
+<ParamField path="field" type="string">
+  The data field associated with this legend. Used when `scale` is set to map
+  field values to legend items.
+</ParamField>
+
+## Continuous Legend Fields
+
+Continuous legends (`type: "color"` or `type: "size"`) extend the common spec with slider-based controls.
+
+<ParamField path="type" type="'color' | 'size'" required>
+  - `"color"` — a gradient color rail whose range maps to a color scale
+  - `"size"` — a triangular size rail whose range maps to a size/radius scale
+</ParamField>
+
+<ParamField path="field" type="string">
+  The data field that the continuous legend maps to. Drives the scale domain
+  from data statistics.
+</ParamField>
+
+<ParamField path="scale" type="string">
+  The `id` of a scale defined in `spec.scales` that this legend controls.
+</ParamField>
+
+<ParamField path="defaultSelected" type="[number, number]">
+  The initial selected range on the continuous slider as `[min, max]`. Values
+  outside this range are filtered from the chart.
+
+  ```json
+  { "defaultSelected": [25, 75] }
+  ```
+</ParamField>
+
+<ParamField path="slidable" type="boolean" default="true">
+  Whether the user can drag the range handles to filter data. Set `false` for a
+  display-only gradient/size legend.
+</ParamField>
+
+<ParamField path="inverse" type="boolean" default="false">
+  Reverses the gradient/size direction so min is at the end and max is at the
+  start. Since v1.11.0.
+</ParamField>
+
+<ParamField path="rail" type="object">
+  Style configuration for the track bar.
+
+  ```json
+  {
+    "rail": {
+      "width": 120,
+      "height": 10,
+      "style": { "cornerRadius": 5 }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="handler" type="object">
+  Style configuration for the draggable range handles.
+
+  ```json
+  {
+    "handler": {
+      "visible": true,
+      "style": { "symbolType": "circle", "size": 12, "fill": "#fff", "stroke": "#1664FF" }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="track" type="object">
+  Style for the selected (active) portion of the rail.
+
+  ```json
+  { "track": { "style": { "fill": "#1664FF" } } }
+  ```
+</ParamField>
+
+<ParamField path="startText" type="TextAttribute">
+  Label displayed at the start (minimum) end of the rail.
+
+  ```json
+  { "startText": { "visible": true, "text": "Low", "space": 6 } }
+  ```
+</ParamField>
+
+<ParamField path="endText" type="TextAttribute">
+  Label displayed at the end (maximum) end of the rail.
+</ParamField>
+
+<ParamField path="handlerText" type="HandlerTextAttribute">
+  Dynamic text shown next to each slider handle indicating the current value.
+
+  ```json
+  {
+    "handlerText": {
+      "visible": true,
+      "precision": 1,
+      "formatter": "(val) => `${val}°C`"
+    }
+  }
+  ```
+</ParamField>
+
+## Legend Interaction Modes
+
+<Accordion title="Discrete legend item states">
+  Each item in a discrete legend has four visual states:
+  - `selected` — the item is active and its series is shown
+  - `unSelected` — the item was clicked off; series data is hidden
+  - `selectedHover` — mouse is over a selected item
+  - `unSelectedHover` — mouse is over a deselected item
+
+  You can style these states via `item.shape.state`, `item.label.state`, etc.
+</Accordion>
+
+<Accordion title="allowAllCancelled">
+  By default, VChart prevents the last remaining selected item from being
+  deselected (to avoid showing an empty chart). This behavior is inherited from
+  the underlying `vrender-components` DiscreteLegend. If your use case requires
+  all items to be clearable, use `customFilter` with explicit all-off logic.
+</Accordion>
+
+<CardGroup cols={2}>
+  <Card title="Discrete Legend" icon="list">
+    Default type for categorical charts. Items are clickable. Supports
+    `defaultSelected`, `maxRow`/`maxCol`, and custom `data` callbacks.
+  </Card>
+  <Card title="Color Legend" icon="palette">
+    Gradient rail for heatmaps and scatter charts with color encoding. Uses a
+    continuous slider range for filtering.
+  </Card>
+  <Card title="Size Legend" icon="circle-dot">
+    Triangular size legend for bubble/scatter charts with size encoding.
+    Supports `sizeBackground` and `align`.
+  </Card>
+  <Card title="Pager / Scrollbar" icon="scroll">
+    Automatic pagination when items overflow. Switch to scrollbar mode with
+    `pager: { type: "scrollbar" }`.
+  </Card>
+</CardGroup>

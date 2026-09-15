@@ -1,0 +1,273 @@
+---
+title: "Chart Components: Axes, Legends, Tooltips and More"
+sidebarTitle: "Components"
+description: "A complete guide to VChart's built-in components — axes, legends, tooltip, crosshair, dataZoom, markers, and more — configured via top-level spec fields."
+---
+
+VChart separates the visual elements of a chart into two broad categories: *series* (which encode your data) and *components* (which provide context, navigation, and annotation). Components are configured through top-level fields on the spec — `axes`, `legends`, `tooltip`, `title`, and so on — and each component type has its own rich configuration interface. Because they are first-class citizens of the spec, components participate in the same theme system, animation pipeline, and event model as everything else in the chart.
+
+## Component Categories
+
+<CardGroup cols={2}>
+  <Card title="Axes" icon="arrows-left-right-to-line">
+    Cartesian linear, band, time, log, symlog; Polar band and linear. Orient as `top`, `bottom`, `left`, `right`, or a polar angle/radius.
+  </Card>
+  <Card title="Legends" icon="list">
+    Discrete (color swatch) and Continuous (color/size gradient slider). Positioned on any side; supports paging for large item lists.
+  </Card>
+  <Card title="Tooltip" icon="comment">
+    Hover/click popups showing dimension and measure values. Fully customisable title, content rows, and entry rendering.
+  </Card>
+  <Card title="Crosshair" icon="crosshairs">
+    Guide lines (or bands) that track the pointer position across the chart to highlight the active dimension value.
+  </Card>
+  <Card title="Title" icon="heading">
+    Chart title and optional subtitle positioned outside the plot area. Supports rich text formatting.
+  </Card>
+  <Card title="DataZoom" icon="magnifying-glass-plus">
+    Range slider that lets users zoom into a sub-range of the x or y axis without modifying the underlying data.
+  </Card>
+  <Card title="ScrollBar" icon="bars-staggered">
+    Scroll bar for overflowing axes — useful when a band axis has more categories than can fit on screen.
+  </Card>
+  <Card title="Brush" icon="paintbrush">
+    Mouse-drag region selection that filters or highlights the enclosed data points.
+  </Card>
+  <Card title="Markers" icon="location-dot">
+    Annotation overlays: `markLine` (reference line), `markArea` (shaded region), `markPoint` (callout label at a data point).
+  </Card>
+  <Card title="Indicator" icon="circle-info">
+    Centre-of-chart statistic display — typically used inside donut or gauge charts to show a primary KPI value.
+  </Card>
+  <Card title="Player" icon="play">
+    Animated timeline player that advances a time dimension step-by-step, with play/pause/seek controls.
+  </Card>
+  <Card title="Label" icon="tag">
+    Data labels attached directly to marks (bars, points, slices). Supports smart collision avoidance and rich text.
+  </Card>
+  <Card title="CustomMark" icon="pen-nib">
+    Escape hatch — render arbitrary VRender marks (`rect`, `text`, `symbol`, `path`, etc.) in the chart's coordinate space.
+  </Card>
+</CardGroup>
+
+## Component Reference
+
+### Axes
+
+Axes are configured via the `axes` array. Every axis spec requires an `orient` and a `type`:
+
+```typescript
+// Cartesian axis types registered in the component index:
+// CartesianLinearAxis  — continuous numeric scale
+// CartesianBandAxis   — ordinal / categorical scale
+// CartesianTimeAxis   — time-based scale
+// CartesianLogAxis    — logarithmic scale
+// CartesianSymlogAxis — symmetric-log scale
+// PolarLinearAxis     — radial / value axis in polar charts
+// PolarBandAxis       — angular / category axis in polar charts
+```
+
+| Field | Purpose |
+|---|---|
+| `orient` | `'bottom' \| 'top' \| 'left' \| 'right'` (Cartesian) or `'angle' \| 'radius'` (Polar) |
+| `type` | `'linear' \| 'band' \| 'time' \| 'log' \| 'symlog'` |
+| `title` | Axis title label config |
+| `label` | Tick label formatting, rotation, visibility |
+| `grid` | Grid line style |
+| `domainLine` | Axis baseline style |
+| `tick` | Major tick marks |
+| `subTick` | Minor tick marks |
+| `min` / `max` | Fixed domain bounds (linear / log axes) |
+| `nice` | Round domain to "nice" numbers |
+| `zero` | Whether to always include zero |
+
+### Legend
+
+```typescript
+// Discrete legend — color swatches for seriesField values
+// ContinuousLegend  — gradient bar / size slider
+```
+
+| Field | Purpose |
+|---|---|
+| `type` | `'discrete'` (default) or `'color'` / `'size'` for continuous |
+| `orient` | `'top' \| 'bottom' \| 'left' \| 'right'` |
+| `position` | `'start' \| 'middle' \| 'end'` within the chosen side |
+| `item` | Per-item style (symbol, label, shape) |
+| `pager` | Pagination controls when items overflow |
+| `select` | Enable click-to-filter interaction |
+| `hover` | Enable hover highlighting |
+| `filter` | Whether legend interaction filters the data |
+
+### Tooltip
+
+| Field | Purpose |
+|---|---|
+| `trigger` | `'hover'` (default), `'click'`, or both |
+| `activeType` | `'mark'` (per data point) or `'dimension'` (all series at that x value) |
+| `title` | Tooltip header — static string or `{ value: formatFn }` |
+| `content` | Array of row definitions — each with `key`, `value`, `shapeType`, `shapeColor` |
+| `style` | Panel background, border, padding, shadow |
+| `enterable` | Whether the mouse can move into the tooltip panel |
+| `handler` | Fully custom tooltip renderer (override default DOM panel) |
+
+### Crosshair
+
+| Field | Purpose |
+|---|---|
+| `xField` / `yField` | Which axis the crosshair tracks |
+| `line` | Line style (`stroke`, `lineWidth`, `lineDash`) |
+| `band` | Band / rect style for band-axis crosshairs |
+| `label` | Floating label that shows the axis value |
+| `trigger` | `'hover'` (default) or `'click'` |
+
+### Markers (markLine / markArea / markPoint)
+
+Reference lines, shaded regions, and callout labels are configured via `spec.markLine`, `spec.markArea`, and `spec.markPoint`:
+
+```javascript
+markLine: [
+  {
+    // Horizontal reference line at y = 180
+    y: 180,
+    label: { text: 'Target', position: 'end' },
+    line: { style: { stroke: '#e33232', lineDash: [4, 4] } }
+  }
+],
+markArea: [
+  {
+    // Shade the region between y = 100 and y = 150
+    y: 100, y1: 150,
+    area: { style: { fill: '#FFC400', fillOpacity: 0.15 } },
+    label: { text: 'Normal Range' }
+  }
+]
+```
+
+## Multi-Component Spec Example
+
+The following spec assembles a bar chart that uses all major component categories — title, dual axes, legend, tooltip, crosshair, dataZoom, and a reference markLine:
+
+```javascript
+const spec = {
+  type: 'bar',
+
+  // ── Data ──────────────────────────────────────────────────────
+  data: {
+    id: 'monthlySales',
+    values: [
+      { month: 'Jan', sales: 120, target: 150 },
+      { month: 'Feb', sales: 200, target: 150 },
+      { month: 'Mar', sales: 150, target: 150 },
+      { month: 'Apr', sales: 80,  target: 150 },
+      { month: 'May', sales: 170, target: 150 },
+      { month: 'Jun', sales: 210, target: 150 }
+    ]
+  },
+
+  xField: 'month',
+  yField: 'sales',
+
+  // ── Title ────────────────────────────────────────────────────
+  title: {
+    text: 'Monthly Sales Performance',
+    subtext: 'Jan – Jun, compared against target',
+    orient: 'top',
+    textStyle: { fontSize: 16, fontWeight: 'bold' }
+  },
+
+  // ── Axes ─────────────────────────────────────────────────────
+  axes: [
+    {
+      orient: 'bottom',
+      type: 'band',
+      label: { visible: true }
+    },
+    {
+      orient: 'left',
+      type: 'linear',
+      title: { visible: true, text: 'Sales (units)' },
+      grid: { visible: true, style: { lineDash: [4, 4] } },
+      zero: true
+    }
+  ],
+
+  // ── Legend ───────────────────────────────────────────────────
+  legends: {
+    visible: true,
+    orient: 'top',
+    position: 'end'
+  },
+
+  // ── Tooltip ──────────────────────────────────────────────────
+  tooltip: {
+    visible: true,
+    trigger: 'hover',
+    activeType: 'dimension'
+  },
+
+  // ── Crosshair ────────────────────────────────────────────────
+  crosshair: {
+    xField: { visible: true, line: { type: 'line' } }
+  },
+
+  // ── DataZoom ─────────────────────────────────────────────────
+  dataZoom: [
+    {
+      orient: 'bottom',
+      startValue: 'Jan',
+      endValue: 'Jun',
+      filterMode: 'filter'
+    }
+  ],
+
+  // ── Reference line at target = 150 ───────────────────────────
+  markLine: [
+    {
+      y: 150,
+      label: { text: 'Target: 150', position: 'insideEndTop' },
+      line: {
+        style: { stroke: '#e33232', lineWidth: 2, lineDash: [6, 3] }
+      }
+    }
+  ]
+};
+```
+
+## Component Registration
+
+VChart uses a modular registration system. Each component ships with a `register*` function that you must call before the first render when using the tree-shaken build:
+
+```javascript
+import VChart from '@visactor/vchart';
+import {
+  registerCartesianLinearAxis,
+  registerCartesianBandAxis,
+  registerDiscreteLegend,
+  registerTooltip,
+  registerCartesianCrossHair,
+  registerDataZoom,
+  registerMarkLine,
+  registerTitle
+} from '@visactor/vchart';
+
+// Register only the components you use
+VChart.useRegisters([
+  registerCartesianLinearAxis,
+  registerCartesianBandAxis,
+  registerDiscreteLegend,
+  registerTooltip,
+  registerCartesianCrossHair,
+  registerDataZoom,
+  registerMarkLine,
+  registerTitle
+]);
+```
+
+<Tip>
+If you import from `@visactor/vchart` (the default bundle) rather than the tree-shakeable entry point, all components are pre-registered and you can skip the `useRegisters` call.
+</Tip>
+
+<Warning>
+Forgetting to register a component does not throw an error — the component is silently skipped during rendering. If a component appears missing, double-check that its `register*` function has been called before the chart is created.
+</Warning>

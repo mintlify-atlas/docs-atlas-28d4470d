@@ -1,0 +1,349 @@
+---
+title: "3D Chart Types in VChart Extension"
+sidebarTitle: "3D Charts"
+description: "VChart 3D chart types — bar3d, pie3d, funnel3d, histogram3d, wordCloud3d, rangeColumn3d — provided by the @visactor/vchart-extension package."
+---
+
+VChart's 3D chart types are not part of the core `@visactor/vchart` package. They ship in the separate `@visactor/vchart-extension` package, which builds on top of VChart's rendering infrastructure to add perspective-correct 3D geometry, lighting, and a camera system powered by `@visactor/vrender-core`. Because the 3D plugin modifies the render pipeline, it must be activated with `register3DPlugin()` before any 3D chart is created.
+
+<Note>
+  3D charts require both `@visactor/vchart` and `@visactor/vchart-extension` to be installed. The extension package re-exports everything from VChart, so you do not need to maintain two separate imports in most bundler setups.
+</Note>
+
+## Installation
+
+<CodeGroup>
+
+```bash npm
+npm install @visactor/vchart @visactor/vchart-extension
+```
+
+```bash yarn
+yarn add @visactor/vchart @visactor/vchart-extension
+```
+
+```bash pnpm
+pnpm add @visactor/vchart @visactor/vchart-extension
+```
+
+</CodeGroup>
+
+## Enabling the 3D Plugin
+
+The `register3DPlugin()` function registers the VChart3dPlugin, which sets up the orthographic camera, directional lighting, and 3D view transform for the render stage. Call it once at application startup alongside your chart registrations:
+
+```ts
+import VChart from '@visactor/vchart';
+import {
+  register3DPlugin,
+  registerBar3dChart,
+  registerPie3dChart,
+  registerFunnel3dChart,
+  registerHistogram3dChart,
+  registerWordCloud3dChart,
+  registerRangeColumn3dChart
+} from '@visactor/vchart-extension';
+
+// Enable the 3D rendering pipeline
+register3DPlugin();
+
+// Register only the chart types you use
+registerBar3dChart();
+registerPie3dChart();
+```
+
+<Warning>
+  `register3DPlugin()` is automatically called by every individual chart registration function (e.g. `registerBar3dChart()`), so explicit calls are only necessary when you want to ensure initialization order. Do **not** call it before the VChart environment is ready.
+</Warning>
+
+## Chart Types
+
+<AccordionGroup>
+
+<Accordion title="3D Bar Chart — type: 'bar3d'">
+
+The `bar3d` chart renders rectangular bars as extruded 3D cuboids with a configurable depth, producing a perspective view of the same data as a standard bar chart. The spec is a drop-in superset of `IBarChartSpec` — every `bar` option works unchanged, with the addition of the 3D extrusion depth coming from the chart plugin.
+
+**Key spec fields**
+
+All standard bar chart fields apply. The `type` is the only required change.
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | `'bar3d'` | Chart type identifier |
+| `xField` | `string \| string[]` | Category / band axis field |
+| `yField` | `string \| string[]` | Numeric value field |
+| `seriesField` | `string` | Grouping / color field |
+| `stack` | `boolean` | Stack series |
+| `direction` | `'vertical' \| 'horizontal'` | Bar orientation |
+
+```ts
+import VChart from '@visactor/vchart';
+import {
+  register3DPlugin,
+  registerBar3dChart
+} from '@visactor/vchart-extension';
+
+register3DPlugin();
+registerBar3dChart();
+
+const spec = {
+  type: 'bar3d',
+  data: {
+    values: [
+      { quarter: 'Q1', product: 'Alpha', revenue: 1200 },
+      { quarter: 'Q1', product: 'Beta',  revenue: 800  },
+      { quarter: 'Q2', product: 'Alpha', revenue: 1540 },
+      { quarter: 'Q2', product: 'Beta',  revenue: 1100 },
+      { quarter: 'Q3', product: 'Alpha', revenue: 1380 },
+      { quarter: 'Q3', product: 'Beta',  revenue: 960  },
+      { quarter: 'Q4', product: 'Alpha', revenue: 1750 },
+      { quarter: 'Q4', product: 'Beta',  revenue: 1320 }
+    ]
+  },
+  xField: 'quarter',
+  yField: 'revenue',
+  seriesField: 'product',
+  axes: [
+    { orient: 'bottom', type: 'band' },
+    { orient: 'left',   type: 'linear' }
+  ],
+  legends: { visible: true }
+};
+
+const chart = new VChart(spec, { dom: 'chart-container' });
+chart.renderSync();
+```
+
+</Accordion>
+
+<Accordion title="3D Pie Chart — type: 'pie3d'">
+
+The `pie3d` chart renders the standard pie / donut chart with a configurable tilt angle around the x-axis (`angle3d`), giving it the appearance of a disk viewed in perspective. All `pie` spec fields (`categoryField`, `valueField`, `innerRadius`, `outerRadius`, etc.) are inherited unchanged.
+
+**Key spec fields**
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | `'pie3d'` | Chart type identifier |
+| `categoryField` | `string` | Category label field |
+| `valueField` | `string` | Arc size field |
+| `angle3d` | `number` | Tilt angle around the x-axis (degrees) |
+| `innerRadius` | `number` | Donut inner radius (0–1) |
+| `outerRadius` | `number` | Outer arc radius (0–1) |
+
+```ts
+import {
+  register3DPlugin,
+  registerPie3dChart
+} from '@visactor/vchart-extension';
+
+register3DPlugin();
+registerPie3dChart();
+
+const spec = {
+  type: 'pie3d',
+  data: {
+    values: [
+      { segment: 'Desktop', share: 52 },
+      { segment: 'Mobile',  share: 36 },
+      { segment: 'Tablet',  share: 12 }
+    ]
+  },
+  categoryField: 'segment',
+  valueField: 'share',
+  angle3d: 30,
+  outerRadius: 0.75,
+  innerRadius: 0
+};
+```
+
+</Accordion>
+
+<Accordion title="3D Funnel Chart — type: 'funnel3d'">
+
+The `funnel3d` chart renders a funnel or pyramid with extruded 3D trapezoidal layers. It is built on top of `IFunnelSeriesSpec` and accepts identical field configuration, making it easy to swap a flat funnel for a 3D one by changing `type`.
+
+**Key spec fields**
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | `'funnel3d'` | Chart type identifier |
+| `categoryField` | `string` | Stage label field |
+| `valueField` | `string` | Stage size field |
+| `isTransform` | `boolean` | Show conversion-loss gaps between stages |
+| `shape` | `'trapezoid' \| 'rect'` | Layer shape |
+
+```ts
+import {
+  register3DPlugin,
+  registerFunnel3dChart
+} from '@visactor/vchart-extension';
+
+register3DPlugin();
+registerFunnel3dChart();
+
+const spec = {
+  type: 'funnel3d',
+  data: {
+    values: [
+      { stage: 'Awareness',     count: 10000 },
+      { stage: 'Interest',      count: 6800  },
+      { stage: 'Consideration', count: 3200  },
+      { stage: 'Intent',        count: 1500  },
+      { stage: 'Purchase',      count: 740   }
+    ]
+  },
+  categoryField: 'stage',
+  valueField: 'count',
+  isTransform: true
+};
+```
+
+</Accordion>
+
+<Accordion title="3D Histogram — type: 'histogram3d'">
+
+The `histogram3d` chart renders frequency distribution bins as extruded 3D cuboids. Like the 2D histogram, each bin spans from `xField` to `x2Field` on the categorical axis; the `histogram3d` type simply adds depth to each bar.
+
+**Key spec fields**
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | `'histogram3d'` | Chart type identifier |
+| `xField` | `string` | Bin lower-bound field |
+| `x2Field` | `string` | Bin upper-bound field |
+| `yField` | `string` | Frequency / count field |
+
+```ts
+import {
+  register3DPlugin,
+  registerHistogram3dChart
+} from '@visactor/vchart-extension';
+
+register3DPlugin();
+registerHistogram3dChart();
+
+const spec = {
+  type: 'histogram3d',
+  data: {
+    values: [
+      { start: 0,  end: 10, freq: 8  },
+      { start: 10, end: 20, freq: 23 },
+      { start: 20, end: 30, freq: 41 },
+      { start: 30, end: 40, freq: 35 },
+      { start: 40, end: 50, freq: 18 },
+      { start: 50, end: 60, freq: 6  }
+    ]
+  },
+  xField: 'start',
+  x2Field: 'end',
+  yField: 'freq'
+};
+```
+
+</Accordion>
+
+<Accordion title="3D Word Cloud — type: 'wordCloud3d'">
+
+The `wordCloud3d` chart projects word tokens onto the surface of a sphere using a stereographic projection algorithm. Words are sized by `valueField`, and the `depth_3d` parameter controls the sphere radius depth, creating a rotating globe-like appearance.
+
+**Key spec fields**
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | `'wordCloud3d'` | Chart type identifier |
+| `nameField` | `string` | Text token field |
+| `valueField` | `string` | Token weight / frequency field |
+| `depth_3d` | `number` | Sphere depth radius |
+| `postProjection` | `'StereographicProjection'` | Projection algorithm |
+
+```ts
+import {
+  register3DPlugin,
+  registerWordCloud3dChart
+} from '@visactor/vchart-extension';
+
+register3DPlugin();
+registerWordCloud3dChart();
+
+const spec = {
+  type: 'wordCloud3d',
+  data: {
+    values: [
+      { word: 'Machine Learning', count: 520 },
+      { word: 'Deep Learning',    count: 410 },
+      { word: 'Neural Networks',  count: 380 },
+      { word: 'Transformers',     count: 290 },
+      { word: 'LLM',              count: 260 },
+      { word: 'Embeddings',       count: 190 },
+      { word: 'Fine-tuning',      count: 160 }
+    ]
+  },
+  nameField: 'word',
+  valueField: 'count',
+  depth_3d: 400,
+  postProjection: 'StereographicProjection'
+};
+```
+
+</Accordion>
+
+<Accordion title="3D Range Column Chart — type: 'rangeColumn3d'">
+
+The `rangeColumn3d` chart is the 3D equivalent of the range column chart. Each bar spans from a `minField` value to a `maxField` value, and the bars are rendered as extruded 3D cuboids. The spec is otherwise identical to `IRangeColumnSeriesSpec`.
+
+**Key spec fields**
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | `'rangeColumn3d'` | Chart type identifier |
+| `xField` | `string` | Category axis field |
+| `minField` | `string` | Bar lower bound field |
+| `maxField` | `string` | Bar upper bound field |
+
+```ts
+import {
+  register3DPlugin,
+  registerRangeColumn3dChart
+} from '@visactor/vchart-extension';
+
+register3DPlugin();
+registerRangeColumn3dChart();
+
+const spec = {
+  type: 'rangeColumn3d',
+  data: {
+    values: [
+      { city: 'New York',  low: -3,  high: 8  },
+      { city: 'London',    low: 2,   high: 11 },
+      { city: 'Tokyo',     low: 3,   high: 12 },
+      { city: 'Sydney',    low: 18,  high: 26 }
+    ]
+  },
+  xField: 'city',
+  minField: 'low',
+  maxField: 'high'
+};
+```
+
+</Accordion>
+
+</AccordionGroup>
+
+## Performance Considerations
+
+<CardGroup cols={2}>
+  <Card title="Use 3D Intentionally" icon="cube">
+    3D rendering is computationally heavier than 2D. Reserve 3D charts for contexts where the depth dimension meaningfully enhances understanding — avoid purely decorative depth in data-dense dashboards.
+  </Card>
+  <Card title="Bundling the Extension" icon="box">
+    Import only the registration functions you need from `@visactor/vchart-extension` to keep your bundle lean. The extension is tree-shakeable, so unused 3D chart code is excluded at build time.
+  </Card>
+  <Card title="Camera & Lighting" icon="lightbulb">
+    The `register3DPlugin()` call sets up an orthographic camera and a single directional light. Advanced lighting and camera angle overrides can be configured through the stage's `set3dOptions()` method after the chart has been rendered.
+  </Card>
+  <Card title="Mini-Program Compatibility" icon="mobile">
+    3D charts in mini-program environments require the relevant environment adapter (Lark, WeCom, etc.) in addition to the 3D plugin. Register the environment plugin first, then call `register3DPlugin()` and the chart registration functions.
+  </Card>
+</CardGroup>

@@ -1,0 +1,299 @@
+---
+title: "@visactor/vchart-extension: 3D and Advanced Charts"
+sidebarTitle: "vchart-extension"
+description: "Extend VChart with 3D charts, narrative charts, and advanced components from the @visactor/vchart-extension package for richer visualizations."
+---
+
+The `@visactor/vchart-extension` package is an official add-on layer for VChart that ships chart types and components too specialized or heavyweight to bundle by default. It provides full 3D chart variants powered by WebGL (bar3d, pie3d, funnel3d, histogram3d, wordCloud3d, rangeColumn3d), animated narrative charts (rankingBar, storyline, timeline), advanced analysis charts (conversionFunnel, candlestick, pictogram, imageCloud), scatter sequence variants, and a suite of extension components like regression lines, series breaks, bar links, and map labels. Each item is individually tree-shakeable — import only the register function you need and call `VChart.useRegisters([...])`.
+
+## Installation
+
+Install the extension package alongside the core library:
+
+<CodeGroup>
+```bash npm
+npm install @visactor/vchart @visactor/vchart-extension
+```
+
+```bash yarn
+yarn add @visactor/vchart @visactor/vchart-extension
+```
+
+```bash pnpm
+pnpm add @visactor/vchart @visactor/vchart-extension
+```
+</CodeGroup>
+
+<Note>
+`@visactor/vchart-extension` lists `@visactor/vchart` as a peer dependency. Always install both packages together and keep their versions in sync.
+</Note>
+
+## The 3D Plugin
+
+Every 3D chart in the extension relies on a shared plugin that wires up WebGL lighting, camera, and the `layout3d` engine. The plugin is automatically called inside each 3D chart's own register function, but you can also invoke it independently if you are composing charts manually.
+
+```ts
+import { register3DPlugin } from '@visactor/vchart-extension';
+
+register3DPlugin();
+```
+
+Internally `register3DPlugin` registers three VRender primitives:
+
+```ts
+// packages/vchart-extension/src/charts/3d/plugin.ts
+export const register3DPlugin = () => {
+  registerChartPlugin(VChart3dPlugin);
+  registerDirectionalLight();
+  registerOrthoCamera();
+  registerViewTransform3dPlugin();
+};
+```
+
+Pass `options3d` in the `IInitOption` to control the 3D camera perspective:
+
+```ts
+const vchart = new VChart(spec, {
+  dom: 'container',
+  options3d: { alpha: 0, beta: 0.5, fieldRatio: 0.8 }
+});
+```
+
+---
+
+## Chart Reference
+
+<Accordion title="3D Charts">
+
+3D charts extend their 2D counterparts and accept the same spec fields with an added `type` suffix. All 3D charts automatically call `register3DPlugin()` and `registerLayout3d()` in their own register function — you do not need to invoke those separately.
+
+<CardGroup cols={2}>
+  <Card title="registerBar3dChart" icon="chart-bar">
+    Renders grouped or stacked bars in 3D perspective. Extends `BarChart`; accepts all standard `IBarSeriesSpec` fields plus `type: 'bar3d'`.
+  </Card>
+  <Card title="registerFunnel3dChart" icon="filter">
+    Funnel chart rendered in 3D. Extends `FunnelChart`; `type: 'funnel3d'`.
+  </Card>
+  <Card title="registerHistogram3dChart" icon="chart-column">
+    3D histogram with configurable bar depth. `type: 'histogram3d'`.
+  </Card>
+  <Card title="registerPie3dChart" icon="chart-pie">
+    Explodable 3D pie / donut chart. `type: 'pie3d'`. Supports the full arc-series animation preset API.
+  </Card>
+  <Card title="registerWordCloud3dChart" icon="cloud">
+    Word cloud rendered on a 3D sphere surface. `type: 'wordCloud3d'`.
+  </Card>
+  <Card title="registerRangeColumn3dChart" icon="chart-gantt">
+    Range (floating) column chart in 3D. `type: 'rangeColumn3d'`.
+  </Card>
+</CardGroup>
+
+**Complete 3D Bar Chart Example**
+
+The example below registers the bar3d chart, sets up a minimal spec, and mounts it into a `<canvas>` element. The `options3d` parameter is passed via `IInitOption`:
+
+```ts
+import VChart from '@visactor/vchart';
+import { registerBar3dChart } from '@visactor/vchart-extension';
+
+// Step 1 — register the chart type (calls register3DPlugin internally)
+VChart.useRegisters([registerBar3dChart]);
+
+// Step 2 — define the spec
+const spec = {
+  type: 'bar3d',
+  data: [
+    {
+      id: 'barData',
+      values: [
+        { month: 'January',  sales: 22 },
+        { month: 'February', sales: 13 },
+        { month: 'March',    sales: 25 },
+        { month: 'April',    sales: 30 },
+        { month: 'May',      sales: 19 }
+      ]
+    }
+  ],
+  xField: 'month',
+  yField: 'sales',
+  bar3d: {
+    style: { length: 20 }   // depth of the 3D bar in pixels
+  },
+  axes: [
+    { orient: 'bottom', type: 'band' },
+    { orient: 'left',   type: 'linear' }
+  ]
+};
+
+// Step 3 — instantiate with 3D camera options
+const vchart = new VChart(spec, {
+  dom: 'container',
+  options3d: { alpha: 0, beta: 0.45 }
+});
+
+vchart.renderAsync();
+```
+
+**3D Axis Registers**
+
+When you need explicit axis control in a 3D chart, import the 3D-aware axis variants from the extension:
+
+```ts
+import {
+  registerCartesianBandAxis3d,
+  registerCartesianLinearAxis3d,
+  registerCartesianLogAxis3d,
+  registerCartesianTimeAxis3d,
+  registerCartesianSymlogAxis3d,
+  registerAxis3dPlugin
+} from '@visactor/vchart-extension';
+
+VChart.useRegisters([
+  registerBar3dChart,
+  registerAxis3dPlugin,
+  registerCartesianBandAxis3d,
+  registerCartesianLinearAxis3d
+]);
+```
+
+</Accordion>
+
+<Accordion title="Narrative & Animated Charts">
+
+These chart types are designed for animated story-telling and dynamic ranking experiences. Several of them accept an optional `{ VChart }` option in their register function so you can pass a custom VChart constructor (useful for micro-frontend or isolated-scope scenarios).
+
+<CardGroup cols={2}>
+  <Card title="registerRankingBarChart" icon="ranking-star">
+    Animated bar race / ranking-bar chart. Requires `xField`, `yField`, and `timeField` in the spec. `type: 'rankingBar'`.
+  </Card>
+  <Card title="registerRankingList" icon="list-ol">
+    Animated ranked list table. `type: 'rankingList'`.
+  </Card>
+  <Card title="registerConversionFunnelChart" icon="funnel-dollar">
+    Multi-step conversion funnel with percentage annotations between layers. `type: 'conversionFunnel'`.
+  </Card>
+  <Card title="registerSequenceScatterLink" icon="link">
+    Temporal scatter chart that draws link paths between sequence events. `type: 'sequenceScatterLink'`.
+  </Card>
+  <Card title="registerSequenceScatterKDE" icon="wave-square">
+    Sequence scatter with KDE density curve overlay. `type: 'sequenceScatterKDE'`.
+  </Card>
+  <Card title="registerSequenceScatterPixel" icon="grid">
+    Pixel-density sequence scatter for large data sets. `type: 'sequenceScatterPixel'`.
+  </Card>
+  <Card title="registerPictogramChart" icon="image">
+    SVG-based pictogram chart where each glyph represents a data value. `type: 'pictogram'`. Supports element-level interactions via `registerElementHighlightByGraphicName`.
+  </Card>
+  <Card title="registerImageCloudChart" icon="images">
+    Image cloud — a word-cloud variant where images replace text tokens. `type: 'imageCloud'`.
+  </Card>
+  <Card title="registerCandlestickChart" icon="chart-candlestick">
+    Financial candlestick chart with open/high/low/close mapping. `type: 'candlestick'`.
+  </Card>
+  <Card title="registerCombinationCandlestickChart" icon="chart-mixed">
+    Candlestick chart pre-configured with volume bars as a combination layout. `type: 'combinationCandlestick'`.
+  </Card>
+  <Card title="registerTimelineChart" icon="timeline">
+    Horizontal timeline event chart. `type: 'timeline'`.
+  </Card>
+  <Card title="registerStorylineChart" icon="book-open">
+    Character-arc / Storyline narrative chart. Requires an array `data` field in the spec. `type: 'storyline'`.
+  </Card>
+</CardGroup>
+
+**Ranking Bar Example**
+
+```ts
+import VChart from '@visactor/vchart';
+import { registerRankingBarChart } from '@visactor/vchart-extension';
+
+registerRankingBarChart({ VChart });
+
+const spec = {
+  type: 'rankingBar',
+  data: [
+    {
+      id: 'rankingData',
+      values: [
+        { name: 'Alpha',   value: 420, year: '2020' },
+        { name: 'Beta',    value: 380, year: '2020' },
+        { name: 'Gamma',   value: 520, year: '2021' },
+        { name: 'Alpha',   value: 480, year: '2021' }
+      ]
+    }
+  ],
+  xField: 'value',
+  yField: 'name',
+  timeField: 'year',
+  player: { auto: true, interval: 1000 }
+};
+
+const vchart = new VChart(spec, { dom: 'container' });
+vchart.renderAsync();
+```
+
+<Tip>
+`registerRankingBarChart` and `registerStorylineChart` accept `{ VChart }` as an optional argument. Pass your own VChart constructor when working in environments where multiple VChart instances coexist.
+</Tip>
+
+</Accordion>
+
+<Accordion title="Extension Components">
+
+Extension components augment existing charts with additional visual layers. Register them individually alongside the chart types they decorate.
+
+<CardGroup cols={2}>
+  <Card title="registerSeriesBreak" icon="scissors">
+    Adds zigzag break marks to bar, area, and line series at specified axis ranges. Useful when data spans orders of magnitude.
+  </Card>
+  <Card title="registerBarLink" icon="link">
+    Draws connector arrows between adjacent bars in a grouped bar chart to visualize change direction and magnitude.
+  </Card>
+  <Card title="registerSeriesLabel" icon="tag">
+    Attaches persistent series-level labels to line or area charts — separate from the per-point data labels.
+  </Card>
+  <Card title="registerMapLabel" icon="map-pin">
+    Renders callout labels at map feature centroids with leader lines. Accepts a `{ VChart }` option.
+  </Card>
+  <Card title="registerRegressionLine" icon="chart-line">
+    Draws a regression curve (linear, polynomial, or exponential) over a scatter plot, optionally with a confidence-interval band.
+  </Card>
+  <Card title="registerExtensionMarkSyncStatePlugin" icon="rotate">
+    Plugin that synchronises interaction states (highlight, select, active) across extension marks and their paired series marks.
+  </Card>
+</CardGroup>
+
+**Regression Line Example**
+
+```ts
+import VChart from '@visactor/vchart';
+import { registerRegressionLine } from '@visactor/vchart-extension';
+
+VChart.useRegisters([registerRegressionLine]);
+
+const spec = {
+  type: 'scatter',
+  data: [{ id: 'scatter', values: [
+    { x: 1, y: 2.1 }, { x: 2, y: 3.8 }, { x: 3, y: 5.2 },
+    { x: 4, y: 6.9 }, { x: 5, y: 9.1 }
+  ]}],
+  xField: 'x',
+  yField: 'y',
+  extensionMark: [
+    {
+      type: 'component',
+      componentType: 'regressionLine',
+      dataId: 'scatter',
+      style: {
+        line: { visible: true, style: { stroke: '#2196F3' } },
+        label: { visible: true, text: 'Linear fit' }
+      }
+    }
+  ]
+};
+
+const vchart = new VChart(spec, { dom: 'container' });
+vchart.renderAsync();
+```
+
+</Accordion>

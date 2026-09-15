@@ -1,0 +1,258 @@
+---
+title: "Hierarchy Charts: Treemap, Sunburst, Circle Packing"
+sidebarTitle: "Hierarchy"
+description: "VChart hierarchy chart types — treemap, sunburst, and circlePacking — explained with hierarchical data format, spec fields, and code examples."
+---
+
+Hierarchy charts in VChart visualize nested, tree-structured data where each node can contain zero or more child nodes. The three available types — treemap, sunburst, and circle packing — each slice the same data structure differently: rectangular tiles, concentric arcs, or nested circles. All three require a `data` spec that uses a recursive `children` array to define the tree depth, along with `categoryField` to name each node and `valueField` to control the relative size.
+
+## Hierarchical Data Format
+
+Every hierarchy chart expects data in the following recursive shape:
+
+```json
+{
+  "name": "root",
+  "children": [
+    {
+      "name": "Category A",
+      "children": [
+        { "name": "Item A1", "value": 120 },
+        { "name": "Item A2", "value": 80 }
+      ]
+    },
+    {
+      "name": "Category B",
+      "children": [
+        { "name": "Item B1", "value": 200 },
+        { "name": "Item B2", "value": 60 }
+      ]
+    }
+  ]
+}
+```
+
+Leaf nodes carry the numeric `value` that drives sizing. Intermediate nodes derive their size from the sum of their descendants. VChart passes this structure directly to the `data.values` field as a single-element array containing the root object.
+
+## Registering Hierarchy Charts
+
+```ts
+import {
+  registerTreemapChart,
+  registerSunburstChart,
+  registerCirclePackingChart
+} from '@visactor/vchart';
+
+registerTreemapChart();
+registerSunburstChart();
+registerCirclePackingChart();
+```
+
+## Chart Types
+
+<AccordionGroup>
+
+<Accordion title="Treemap — type: 'treemap'">
+
+Treemaps partition a rectangular canvas into nested rectangles where each tile's area is proportional to its `valueField`. They are the most space-efficient way to display hundreds of hierarchical leaf nodes at once, and VChart supports drill-down interaction on click.
+
+**Key spec fields**
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | `'treemap'` | Chart type identifier |
+| `categoryField` | `string` | Node label field |
+| `valueField` | `string` | Tile size field |
+| `aspectRatio` | `number` | Target tile aspect ratio (default: golden ratio) |
+| `splitType` | `string` | Tiling algorithm: `'binary'`, `'squarify'`, `'slice'`, `'dice'`, `'sliceDice'` |
+| `gapWidth` | `number` | Pixel gap between sibling tiles |
+| `nodePadding` | `number \| number[]` | Inner padding for parent nodes |
+| `maxDepth` | `number` | Maximum depth to render |
+
+```ts
+import VChart from '@visactor/vchart';
+import { registerTreemapChart } from '@visactor/vchart';
+
+registerTreemapChart();
+
+const spec = {
+  type: 'treemap',
+  data: {
+    values: [
+      {
+        name: 'Technology',
+        children: [
+          {
+            name: 'Cloud',
+            children: [
+              { name: 'Compute',  value: 580 },
+              { name: 'Storage',  value: 410 },
+              { name: 'Database', value: 290 }
+            ]
+          },
+          {
+            name: 'Security',
+            children: [
+              { name: 'IAM',       value: 180 },
+              { name: 'Firewall',  value: 140 }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  categoryField: 'name',
+  valueField: 'value',
+  aspectRatio: 1.618,
+  gapWidth: 2,
+  nodePadding: [20, 4, 4, 4],
+  label: {
+    visible: true
+  }
+};
+
+const chart = new VChart(spec, { dom: 'chart-container' });
+chart.renderSync();
+```
+
+<Tip>
+  Set `drill: true` on the spec to enable click-to-drill-down navigation. When active, clicking a parent tile zooms into its children, and a back-navigation control appears automatically.
+</Tip>
+
+</Accordion>
+
+<Accordion title="Sunburst Chart — type: 'sunburst'">
+
+Sunburst charts display hierarchical data as concentric rings. The root node occupies the center (or is omitted), first-level children form the innermost ring, and deeper levels radiate outward. Arc angle encodes the `valueField` proportion at each level.
+
+**Key spec fields**
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | `'sunburst'` | Chart type identifier |
+| `categoryField` | `string` | Node label field |
+| `valueField` | `string` | Arc angle sizing field |
+| `centerX` | `number` | Chart center x-offset (px) |
+| `centerY` | `number` | Chart center y-offset (px) |
+| `startAngle` | `number` | Start angle in degrees (default `-90`) |
+| `endAngle` | `number` | End angle in degrees |
+| `innerRadius` | `number \| string` | Innermost ring inner radius |
+| `outerRadius` | `number \| string` | Outermost ring outer radius |
+
+```ts
+import { registerSunburstChart } from '@visactor/vchart';
+
+registerSunburstChart();
+
+const spec = {
+  type: 'sunburst',
+  data: {
+    values: [
+      {
+        name: 'Budget',
+        children: [
+          {
+            name: 'Operations',
+            children: [
+              { name: 'Payroll',   value: 4200 },
+              { name: 'Facilities',value: 1100 }
+            ]
+          },
+          {
+            name: 'Marketing',
+            children: [
+              { name: 'Digital', value: 900 },
+              { name: 'Events',  value: 600 }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  categoryField: 'name',
+  valueField: 'value',
+  innerRadius: 0,
+  outerRadius: 0.85,
+  label: { visible: true, layout: { align: 'arc' } }
+};
+```
+
+</Accordion>
+
+<Accordion title="Circle Packing — type: 'circlePacking'">
+
+Circle packing charts arrange hierarchical nodes as nested circles where each parent circle contains and sizes its children. Leaf nodes are rendered in a distinct fill color and inner nodes provide structural grouping. The layout uses a force-directed packing algorithm that maximises space usage.
+
+**Key spec fields**
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | `'circlePacking'` | Chart type identifier |
+| `categoryField` | `string` | Node label field |
+| `valueField` | `string` | Circle area sizing field |
+| `layoutPadding` | `number \| number[]` | Padding between circles per depth level |
+| `drill` | `boolean` | Enable click drill-down |
+| `drillField` | `string` | Field key used for drill navigation |
+
+```ts
+import { registerCirclePackingChart } from '@visactor/vchart';
+
+registerCirclePackingChart();
+
+const spec = {
+  type: 'circlePacking',
+  data: {
+    values: [
+      {
+        name: 'Products',
+        children: [
+          {
+            name: 'Hardware',
+            children: [
+              { name: 'Laptops', value: 340 },
+              { name: 'Servers', value: 210 }
+            ]
+          },
+          {
+            name: 'Software',
+            children: [
+              { name: 'Licenses', value: 490 },
+              { name: 'SaaS',     value: 380 }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  categoryField: 'name',
+  valueField: 'value',
+  layoutPadding: [10, 5],
+  drill: true,
+  label: { visible: true }
+};
+```
+
+<Note>
+  Circle packing performs best with up to three or four depth levels. Deeper trees tend to produce very small leaf circles that become illegible. Consider switching to a treemap when you have many leaf nodes at deep nesting levels.
+</Note>
+
+</Accordion>
+
+</AccordionGroup>
+
+## Common Hierarchy Patterns
+
+<CardGroup cols={2}>
+  <Card title="Adding Color by Depth" icon="palette">
+    Use `seriesField` to map a field onto color. VChart automatically generates a distinct color for each value, allowing you to visually distinguish categories even when the hierarchy is deeply nested.
+  </Card>
+  <Card title="Drill-Down Interactions" icon="arrow-down-to-bracket">
+    All three hierarchy chart types support `drill: true`. When enabled, clicking a parent node zooms into that subtree. Use the `vchart.drillDown()` and `vchart.drillUp()` API methods for programmatic navigation.
+  </Card>
+  <Card title="Custom Labels" icon="tag">
+    Each chart type exposes a `label` spec where you can control visibility, font size, truncation, and layout strategy. Treemap supports separate `label` and `nonLeafLabel` configurations for leaf and branch nodes.
+  </Card>
+  <Card title="Responsive Sizing" icon="arrows-maximize">
+    Set `outerRadius` and `innerRadius` as percentages (e.g., `'80%'`) or decimals (e.g., `0.8`) to make the chart scale responsively within its container without hard-coding pixel dimensions.
+  </Card>
+</CardGroup>

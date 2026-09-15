@@ -1,0 +1,309 @@
+---
+title: "Polar Charts: Pie, Rose, Radar, Gauge and Progress"
+sidebarTitle: "Polar"
+description: "VChart polar chart types — pie, donut, rose, radar, circularProgress, linearProgress, and gauge — with spec examples and register functions."
+---
+
+Polar charts in VChart map data onto a circular or angular coordinate system rather than the traditional x/y Cartesian plane. The family spans everything from classic pie and donut charts that partition a whole, to rose and radar charts that compare multiple dimensions, through to gauge and progress indicators for dashboards. Each type shares a common `categoryField` / `valueField` pattern and supports the same theming, animation, and legend infrastructure as other VChart charts.
+
+## Registering Polar Charts
+
+Use tree-shaking-friendly registration functions to include only the chart types your application needs:
+
+```ts
+import VChart from '@visactor/vchart';
+import {
+  registerPieChart,
+  registerRoseChart,
+  registerRadarChart,
+  registerCircularProgressChart,
+  registerLinearProgressChart,
+  registerGaugeChart
+} from '@visactor/vchart';
+
+registerPieChart();
+registerRoseChart();
+registerRadarChart();
+registerCircularProgressChart();
+registerLinearProgressChart();
+registerGaugeChart();
+```
+
+## Chart Types
+
+<AccordionGroup>
+
+<Accordion title="Pie Chart — type: 'pie'">
+
+Pie charts divide a full circle into proportional sectors, where each sector's arc angle represents the relative size of a category. The same spec supports **donut charts** by setting `innerRadius` to a value greater than 0.
+
+**Key spec fields**
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | `'pie'` | Chart type identifier |
+| `categoryField` | `string` | Category / label field |
+| `valueField` | `string` | Numeric proportion field |
+| `outerRadius` | `number` | Outer arc radius (0–1, default `0.6`) |
+| `innerRadius` | `number` | Inner arc radius; set `> 0` for donut |
+| `startAngle` | `number` | Start angle in degrees (default `-90`) |
+| `endAngle` | `number` | End angle in degrees (default `270`) |
+| `padAngle` | `number` | Gap angle between sectors |
+
+<CodeGroup>
+
+```ts Pie Chart
+import { registerPieChart } from '@visactor/vchart';
+
+registerPieChart();
+
+const spec = {
+  type: 'pie',
+  data: {
+    values: [
+      { category: 'Direct',   sales: 4200 },
+      { category: 'Email',    sales: 2800 },
+      { category: 'Search',   sales: 6100 },
+      { category: 'Referral', sales: 1500 }
+    ]
+  },
+  categoryField: 'category',
+  valueField: 'sales'
+};
+```
+
+```ts Donut Chart
+import { registerPieChart } from '@visactor/vchart';
+
+registerPieChart();
+
+const spec = {
+  type: 'pie',
+  data: {
+    values: [
+      { category: 'Completed', value: 68 },
+      { category: 'Remaining', value: 32 }
+    ]
+  },
+  categoryField: 'category',
+  valueField: 'value',
+  innerRadius: 0.5,
+  outerRadius: 0.8
+};
+```
+
+</CodeGroup>
+
+<Tip>
+  Combine `innerRadius` with an `indicator` spec to place a centered text label inside the donut hole — useful for displaying totals or a selected segment's value.
+</Tip>
+
+</Accordion>
+
+<Accordion title="Rose Chart — type: 'rose'">
+
+Rose charts (also called polar bar or Nightingale charts) encode values as the *radius* of each sector rather than the arc angle. This makes it easy to compare magnitudes across evenly-spaced angular categories.
+
+**Key spec fields**
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | `'rose'` | Chart type identifier |
+| `categoryField` | `string \| string[]` | Category (angular) field |
+| `valueField` | `string \| string[]` | Radius encoding field |
+| `seriesField` | `string` | Optional color grouping field |
+| `stack` | `boolean` | Stack multiple series radially |
+
+```ts
+import { registerRoseChart } from '@visactor/vchart';
+
+registerRoseChart();
+
+const spec = {
+  type: 'rose',
+  data: {
+    values: [
+      { month: 'Jan', rainfall: 58,  wind: 31 },
+      { month: 'Feb', rainfall: 42,  wind: 28 },
+      { month: 'Mar', rainfall: 71,  wind: 45 },
+      { month: 'Apr', rainfall: 103, wind: 62 },
+      { month: 'May', rainfall: 95,  wind: 55 },
+      { month: 'Jun', rainfall: 80,  wind: 48 }
+    ]
+  },
+  categoryField: 'month',
+  valueField: 'rainfall',
+  seriesField: 'month'
+};
+```
+
+</Accordion>
+
+<Accordion title="Radar Chart — type: 'radar'">
+
+Radar charts (spider / web charts) plot multi-dimensional quantitative data as a polygon on equally-spaced radial axes. They are ideal for comparing an entity's profile across several metrics simultaneously.
+
+**Key spec fields**
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | `'radar'` | Chart type identifier |
+| `categoryField` | `string` | Angular axis (dimension name) field |
+| `valueField` | `string` | Radial value field |
+| `seriesField` | `string` | Series color grouping |
+| `seriesMark` | `'area' \| 'line' \| 'point'` | Primary mark shown in the legend |
+| `activePoint` | `boolean` | Show hover interaction points |
+
+```ts
+import { registerRadarChart } from '@visactor/vchart';
+
+registerRadarChart();
+
+const spec = {
+  type: 'radar',
+  data: {
+    values: [
+      { skill: 'Speed',    teamA: 80, teamB: 60 },
+      { skill: 'Strength', teamA: 55, teamB: 90 },
+      { skill: 'Agility',  teamA: 70, teamB: 65 },
+      { skill: 'Stamina',  teamA: 90, teamB: 75 },
+      { skill: 'Tactics',  teamA: 65, teamB: 85 }
+    ]
+  },
+  categoryField: 'skill',
+  valueField: ['teamA', 'teamB'],
+  seriesField: 'type',
+  seriesMark: 'area'
+};
+```
+
+</Accordion>
+
+<Accordion title="Circular Progress — type: 'circularProgress'">
+
+Circular progress charts render arc-shaped progress indicators — similar to a donut chart with a fixed track. They are common in dashboard KPI cards to represent a ratio or percentage of completion.
+
+**Key spec fields**
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | `'circularProgress'` | Chart type identifier |
+| `valueField` | `string` | Progress proportion field (0 – `maxValue`) |
+| `categoryField` | `string \| string[]` | Optional category for multi-ring layout |
+| `maxValue` | `number` | Full-scale value (default `1`) |
+| `outerRadius` | `number` | Arc outer radius |
+| `innerRadius` | `number` | Arc inner radius |
+
+```ts
+import { registerCircularProgressChart } from '@visactor/vchart';
+
+registerCircularProgressChart();
+
+const spec = {
+  type: 'circularProgress',
+  data: {
+    values: [
+      { label: 'Task A', progress: 0.68 },
+      { label: 'Task B', progress: 0.42 },
+      { label: 'Task C', progress: 0.91 }
+    ]
+  },
+  valueField: 'progress',
+  categoryField: 'label',
+  maxValue: 1,
+  outerRadius: 0.9,
+  innerRadius: 0.6
+};
+```
+
+</Accordion>
+
+<Accordion title="Linear Progress — type: 'linearProgress'">
+
+Linear progress charts are horizontal (or vertical) bar-shaped progress indicators with a background track. Unlike a regular bar chart, the track always spans the full axis range, making the completion ratio immediately readable.
+
+**Key spec fields**
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | `'linearProgress'` | Chart type identifier |
+| `xField` | `string \| string[]` | Value field (horizontal) |
+| `yField` | `string \| string[]` | Category label field |
+| `direction` | `'horizontal' \| 'vertical'` | Bar orientation |
+| `bandWidth` | `number` | Progress bar width in pixels |
+
+```ts
+import { registerLinearProgressChart } from '@visactor/vchart';
+
+registerLinearProgressChart();
+
+const spec = {
+  type: 'linearProgress',
+  data: {
+    values: [
+      { task: 'Design',      completion: 0.9  },
+      { task: 'Development', completion: 0.6  },
+      { task: 'Testing',     completion: 0.3  },
+      { task: 'Deployment',  completion: 0.15 }
+    ]
+  },
+  xField: 'completion',
+  yField: 'task',
+  direction: 'horizontal',
+  bandWidth: 24
+};
+```
+
+</Accordion>
+
+<Accordion title="Gauge Chart — type: 'gauge'">
+
+Gauge charts represent a single value within a bounded range using a pointer on a circular arc, akin to a speedometer. The arc can be rendered as a solid background (`gauge` series) or as a circular progress arc. The value axis is a polar linear axis that sets the scale.
+
+**Key spec fields**
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | `'gauge'` | Chart type identifier |
+| `valueField` | `string \| string[]` | Pointer angle field |
+| `radiusField` | `string` | Pointer length field |
+| `gauge` | `object` | Background arc series configuration |
+| `axes` | `array` | Polar or linear axis specs for the scale |
+
+```ts
+import { registerGaugeChart } from '@visactor/vchart';
+
+registerGaugeChart();
+
+const spec = {
+  type: 'gauge',
+  data: {
+    values: [{ value: 72, radius: 0.9 }]
+  },
+  valueField: 'value',
+  radiusField: 'radius',
+  gauge: {
+    type: 'circularProgress',
+    innerRadius: 0.6,
+    outerRadius: 0.8
+  },
+  axes: [
+    {
+      type: 'linear',
+      orient: 'angle',
+      min: 0,
+      max: 100,
+      startAngle: -200,
+      endAngle: 20
+    }
+  ]
+};
+```
+
+<Note>
+  The `gauge` field accepts either a `gauge` series spec or a `circularProgress` series spec. Using `circularProgress` renders a filled colored arc that grows with the value, while `gauge` renders a fixed-width background ring.
+</Note>
+
+</Accordion>
+
+</AccordionGroup>

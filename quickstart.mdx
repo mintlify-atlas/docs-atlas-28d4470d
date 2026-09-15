@@ -1,47 +1,265 @@
 ---
-title: "Quickstart"
-description: "Begin with a guide on the fastest path to a successful outcome"
+title: "Get Started with VChart in 5 Minutes"
+sidebarTitle: "Quickstart"
+description: "Install VChart, write a declarative bar chart spec, render it to a DOM container, and update its data — all in under 5 minutes."
 ---
 
-Describe how someone begins using your product. What is the first thing they need to do? Are there any prerequisites?
-
-A quickstart should take someone from zero to using your product. They'll get a quick win and a sense of what they can accomplish.
-
-## Prerequisites
-
-Before you begin, you must have:
-
-- Requirement one (for example, Node.js 18+, a free account, an API key)
-- Requirement two (for example, a compatible device, a compatible browser, a compatible operating system)
-
-## Get started
+This guide walks you through everything needed to render your first VChart in a browser — from installation to live data updates. By the end you will have a working bar chart on the page and an understanding of the two most fundamental VChart patterns: rendering a spec and updating data without re-creating the chart instance.
 
 <Steps>
-  <Step title="Install">
-    Describe how to install your product or sign up.
 
-    ```bash
-    npm install your-package
-    ```
-  </Step>
-  <Step title="Configure">
-    Describe any setup or configuration needed before first use.
+  <Step title="Install the package">
 
-    ```bash
-    your-cli init
-    ```
-  </Step>
-  <Step title="Run it">
-    Show the first thing a user does to see it working.
+    Add `@visactor/vchart` to your project using your preferred package manager.
 
-    ```bash
-    your-cli start
+    <CodeGroup>
+      ```bash npm
+      npm install @visactor/vchart
+      ```
+
+      ```bash yarn
+      yarn add @visactor/vchart
+      ```
+
+      ```bash pnpm
+      pnpm add @visactor/vchart
+      ```
+    </CodeGroup>
+
+    If you're using a CDN instead, include the minified build directly from unpkg. The global variable `VChart` is exposed on `window`.
+
+    ```html HTML (CDN)
+    <script src="https://unpkg.com/@visactor/vchart/build/index.min.js"></script>
     ```
+
   </Step>
+
+  <Step title="Add a container element">
+
+    VChart renders into any block-level DOM element. Give it a fixed size or let `autoFit: true` fill the parent.
+
+    ```html HTML
+    <!DOCTYPE html>
+    <html lang="en">
+      <head>
+        <meta charset="UTF-8" />
+        <title>My First VChart</title>
+        <style>
+          #chart { width: 600px; height: 400px; }
+        </style>
+      </head>
+      <body>
+        <div id="chart"></div>
+        <script type="module" src="./main.ts"></script>
+      </body>
+    </html>
+    ```
+
+  </Step>
+
+  <Step title="Register the browser environment">
+
+    Before creating any chart instance you must tell VChart which runtime environment it is running in. In a browser, call `registerBrowserEnv()` once at application startup — typically in your entry file.
+
+    ```typescript
+    import { registerBrowserEnv } from '@visactor/vchart';
+
+    registerBrowserEnv();
+    ```
+
+    <Tip>
+      The default `import VChart from '@visactor/vchart'` import (from `vchart-all`) already bundles every chart type and component. You only need `registerBrowserEnv()` separately when using tree-shaking — see the tip at the end of this guide.
+    </Tip>
+
+  </Step>
+
+  <Step title="Define a chart spec">
+
+    A **spec** is a plain JavaScript object that describes the chart declaratively. Set `type` to the chart type, provide `data` as an array of `{ id, values }` objects, and map your data fields to visual channels with `xField` and `yField`.
+
+    ```typescript
+    const spec = {
+      type: 'bar',
+      data: [
+        {
+          id: 'barData',
+          values: [
+            { month: 'Monday',    sales: 22 },
+            { month: 'Tuesday',   sales: 13 },
+            { month: 'Wednesday', sales: 25 },
+            { month: 'Thursday',  sales: 29 },
+            { month: 'Friday',    sales: 38 }
+          ]
+        }
+      ],
+      xField: 'month',
+      yField: 'sales',
+      crosshair: {
+        xField: { visible: true }
+      }
+    };
+    ```
+
+    The `crosshair` block adds a vertical indicator line that follows the cursor — a useful default for cartesian charts.
+
+  </Step>
+
+  <Step title="Instantiate VChart and render">
+
+    Pass the spec and an `IInitOption` object to the `VChart` constructor, then call `renderAsync()`. The second argument must include either `dom` (a container ID string or an `HTMLElement`) or `renderCanvas` (a canvas element or ID).
+
+    ```typescript
+    import VChart from '@visactor/vchart';
+
+    // 'chart' matches the id of the <div> in your HTML
+    const vchart = new VChart(spec, { dom: 'chart' });
+
+    vchart.renderAsync().then(() => {
+      console.log('Chart rendered successfully');
+    });
+    ```
+
+    `renderAsync()` returns a `Promise<IVChart>` that resolves after the first render paint completes. Use `renderSync()` if you need a synchronous return value.
+
+  </Step>
+
+  <Step title="Update data without re-creating the chart">
+
+    Use `updateData(id, newValues)` to push fresh rows into an existing data source. VChart diffs the change, runs a smooth update animation, and leaves all other chart state (zoom, selection, theme) intact.
+
+    ```typescript
+    // Simulate new data arriving after 2 seconds
+    setTimeout(() => {
+      vchart.updateData('barData', [
+        { month: 'Monday',    sales: 42 },
+        { month: 'Tuesday',   sales: 31 },
+        { month: 'Wednesday', sales: 57 },
+        { month: 'Thursday',  sales: 18 },
+        { month: 'Friday',    sales: 63 }
+      ]);
+    }, 2000);
+    ```
+
+    The `id` argument — `'barData'` here — matches the `id` field on the data object inside your spec. `updateData` returns a `Promise<IVChart>` that resolves once the transition animation completes.
+
+  </Step>
+
 </Steps>
 
-<Tip>
-  Give people a way to get help. This could be a link to a support page, a chat with a customer support agent, or a forum for your product.
+## Complete Working Example
 
-  Example: Need help? Reach out to us at [support@yourcompany.com](mailto:support@yourcompany.com).
+Here is the full code from the steps above assembled into a single module:
+
+```typescript main.ts
+import VChart from '@visactor/vchart';
+import { registerBrowserEnv } from '@visactor/vchart';
+
+// 1. Register the browser environment adapter
+registerBrowserEnv();
+
+// 2. Declare the chart spec
+const spec = {
+  type: 'bar',
+  data: [
+    {
+      id: 'barData',
+      values: [
+        { month: 'Monday',    sales: 22 },
+        { month: 'Tuesday',   sales: 13 },
+        { month: 'Wednesday', sales: 25 },
+        { month: 'Thursday',  sales: 29 },
+        { month: 'Friday',    sales: 38 }
+      ]
+    }
+  ],
+  xField: 'month',
+  yField: 'sales',
+  crosshair: {
+    xField: { visible: true }
+  }
+};
+
+// 3. Create the chart instance and render
+const vchart = new VChart(spec, { dom: 'chart' });
+await vchart.renderAsync();
+
+// 4. Update data later without rebuilding the chart
+setTimeout(() => {
+  vchart.updateData('barData', [
+    { month: 'Monday',    sales: 42 },
+    { month: 'Tuesday',   sales: 31 },
+    { month: 'Wednesday', sales: 57 },
+    { month: 'Thursday',  sales: 18 },
+    { month: 'Friday',    sales: 63 }
+  ]);
+}, 2000);
+```
+
+## Updating the Full Spec
+
+When you need to change the chart type or restructure the configuration entirely, use `updateSpec()` instead of `updateData()`:
+
+```typescript
+// Switch from bar to line chart by replacing the whole spec
+await vchart.updateSpec({
+  type: 'line',
+  data: [
+    {
+      id: 'lineData',
+      values: [
+        { month: 'Monday',    sales: 22 },
+        { month: 'Tuesday',   sales: 13 },
+        { month: 'Wednesday', sales: 25 },
+        { month: 'Thursday',  sales: 29 },
+        { month: 'Friday',    sales: 38 }
+      ]
+    }
+  ],
+  xField: 'month',
+  yField: 'sales'
+});
+```
+
+## Cleaning Up
+
+Always call `release()` when the chart is no longer needed to free canvas resources, detach event listeners, and stop ongoing animations:
+
+```typescript
+// e.g., in a React component's useEffect cleanup or a Vue onUnmounted hook
+vchart.release();
+```
+
+## Tree-Shaking for Smaller Bundles
+
+<Tip>
+  The default `import VChart from '@visactor/vchart'` pulls in every chart type and component (~full bundle). For production applications where bundle size matters, import the bare core and register only what you need using `VChart.useRegisters()`.
+
+  ```typescript
+  import { VChart } from '@visactor/vchart';
+  import { registerBarChart } from '@visactor/vchart';
+  import {
+    registerCartesianLinearAxis,
+    registerCartesianBandAxis
+  } from '@visactor/vchart';
+  import { registerTooltip } from '@visactor/vchart';
+  import { registerLabel } from '@visactor/vchart';
+  import { registerBrowserEnv } from '@visactor/vchart';
+  import { registerAnimate } from '@visactor/vchart';
+
+  VChart.useRegisters([
+    registerBarChart,
+    registerCartesianLinearAxis,
+    registerCartesianBandAxis,
+    registerTooltip,
+    registerLabel,
+    registerAnimate
+  ]);
+
+  registerBrowserEnv();
+
+  const vchart = new VChart(spec, { dom: 'chart' });
+  await vchart.renderAsync();
+  ```
+
+  See the [Installation guide](/installation) for the full list of available `register*` functions.
 </Tip>

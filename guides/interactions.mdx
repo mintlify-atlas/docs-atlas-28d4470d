@@ -1,0 +1,311 @@
+---
+title: "Adding Interactions to VChart Visualizations"
+sidebarTitle: "Interactions"
+description: "Learn how to add hover, select, and highlight interactions to VChart charts using the spec interactions array and modular trigger registration."
+---
+
+VChart ships with a rich, pluggable interaction system that lets users engage with data through hover, click, and legend-driven behaviors. Each interaction type is implemented as a **trigger** — a self-contained class that registers its own events, manages graphic state (e.g. `highlight` / `blur`), and can be composed with other triggers on the same chart. Because every trigger is tree-shakeable, you only pay for what you register.
+
+## Built-in Interaction Triggers
+
+VChart exposes the following trigger types, all importable from `@visactor/vchart`:
+
+<CardGroup cols={2}>
+  <Card title="element-active" icon="hand-pointer">
+    Sets hovered elements to an **active** state. Controlled by `trigger` and `triggerOff` events (default: `pointerover` / `pointerout`).
+  </Card>
+  <Card title="element-select" icon="check-square">
+    Applies a **selected** state on click. Supports `single` and `multiple` selection modes with configurable trigger and triggerOff events.
+  </Card>
+  <Card title="element-highlight" icon="highlighter">
+    Highlights the hovered element (`highlight` state) while blurring all others (`blur` state). Trigger is `pointerover` by default.
+  </Card>
+  <Card title="element-highlight-by-key" icon="key">
+    Highlights all elements sharing the same **data key** as the hovered element. Useful for cross-series key matching.
+  </Card>
+  <Card title="element-highlight-by-group" icon="layer-group">
+    Highlights all elements in the same **group** (`groupKey`) as the hovered element. Ideal for grouped bar charts.
+  </Card>
+  <Card title="element-highlight-by-legend" icon="list">
+    Highlights chart elements that correspond to the currently hovered **legend item**, using `legendItemHover` / `legendItemUnHover` events.
+  </Card>
+  <Card title="element-active-by-legend" icon="list-check">
+    Applies the **active** state to elements matching a hovered legend item. Similar to highlight-by-legend but uses a single active state.
+  </Card>
+  <Card title="element-highlight-by-name" icon="tag">
+    Highlights elements matching a specific **graphic name**, useful for custom mark targeting.
+  </Card>
+</CardGroup>
+
+## Registering Interaction Triggers
+
+Interaction triggers are modular and must be registered before use. Import and call the relevant `register*` function before instantiating VChart:
+
+```ts
+import {
+  VChart,
+  registerBarChart,
+  registerElementHighlight,
+  registerElementSelect,
+  registerElementHighlightByLegend,
+  registerElementHighlightByGroup,
+  registerElementHighlightByKey,
+  registerTooltip,
+  registerCartesianLinearAxis,
+  registerCartesianBandAxis
+} from '@visactor/vchart';
+
+VChart.useRegisters([
+  registerBarChart,
+  registerTooltip,
+  registerCartesianLinearAxis,
+  registerCartesianBandAxis,
+  registerElementHighlight,
+  registerElementSelect,
+  registerElementHighlightByLegend,
+  registerElementHighlightByGroup,
+  registerElementHighlightByKey
+]);
+```
+
+<Note>
+  When you import from the default `@visactor/vchart` entry (which re-exports `vchart-all`), all standard interactions including `registerElementActive`, `registerElementActiveByLegend`, `registerElementHighlightByLegend`, `registerElementHighlightByName`, `registerElementHighlightByGroup`, and `registerElementHighlightByKey` are pre-registered. You only need explicit registration when using the selective import pattern for smaller bundles.
+</Note>
+
+## Enabling Interactions via Spec
+
+The simplest way to configure interactions is through the `interactions` array in your chart spec. Each entry specifies a `type` matching one of the trigger names above, plus any trigger-specific options:
+
+```ts
+const spec = {
+  type: 'bar',
+  data: [{ id: 'barData', values: [
+    { month: 'Jan', sales: 42 },
+    { month: 'Feb', sales: 67 },
+    { month: 'Mar', sales: 55 }
+  ]}],
+  xField: 'month',
+  yField: 'sales',
+  interactions: [
+    {
+      type: 'element-highlight',
+      trigger: 'pointerover',
+      triggerOff: 'pointerout'
+    },
+    {
+      type: 'element-select',
+      trigger: 'click',
+      isMultiple: true
+    }
+  ]
+};
+```
+
+### Global Hover and Select Spec
+
+For the common hover/select pattern, VChart exposes a top-level `hover` and `select` shortcut on the spec:
+
+```ts
+const spec = {
+  type: 'line',
+  hover: {
+    enable: true,
+    trigger: 'pointerover',
+    triggerOff: 'pointerout'
+  },
+  select: {
+    enable: true,
+    mode: 'multiple',
+    trigger: 'click',
+    triggerOff: 'empty'
+  },
+  // ...
+};
+```
+
+## Highlight by Legend
+
+The `element-highlight-by-legend` trigger links legend hover events to mark visibility. When a user hovers over a legend item, all chart elements whose group key matches the legend datum are highlighted while the rest are blurred:
+
+```ts
+const spec = {
+  type: 'bar',
+  data: [{ id: 'd', values: [
+    { product: 'A', region: 'North', value: 80 },
+    { product: 'A', region: 'South', value: 60 },
+    { product: 'B', region: 'North', value: 50 },
+    { product: 'B', region: 'South', value: 90 }
+  ]}],
+  xField: 'product',
+  yField: 'value',
+  seriesField: 'region',
+  legends: { visible: true },
+  interactions: [
+    {
+      type: 'element-highlight-by-legend',
+      highlightState: 'highlight',
+      blurState: 'blur',
+      filterType: 'groupKey'
+    }
+  ]
+};
+```
+
+## Brush Selection on a Scatter Chart
+
+The `brush` component enables rectangular or freeform selection, letting users define a region to highlight or filter data. Register it with `registerBrush` and configure it in the spec's `brush` field:
+
+```ts
+import {
+  VChart,
+  registerScatterChart,
+  registerBrush,
+  registerCartesianLinearAxis,
+  registerTooltip
+} from '@visactor/vchart';
+
+VChart.useRegisters([
+  registerScatterChart,
+  registerBrush,
+  registerCartesianLinearAxis,
+  registerTooltip
+]);
+
+const spec = {
+  type: 'scatter',
+  data: [{
+    id: 'scatter',
+    values: [
+      { x: 10, y: 20, category: 'A' },
+      { x: 40, y: 55, category: 'B' },
+      { x: 70, y: 30, category: 'A' },
+      { x: 25, y: 80, category: 'C' },
+      { x: 60, y: 15, category: 'B' }
+    ]
+  }],
+  xField: 'x',
+  yField: 'y',
+  seriesField: 'category',
+  brush: {
+    visible: true,
+    brushType: 'rect',    // 'rect' | 'polygon' | 'x' | 'y'
+    inBrush: {
+      colorAlpha: 1
+    },
+    outOfBrush: {
+      colorAlpha: 0.2
+    }
+  }
+};
+
+const vchart = new VChart(spec, { dom: 'chart-container' });
+vchart.renderSync();
+
+// Listen to brush events
+vchart.on('brushEnd', params => {
+  console.log('Selected data:', params.value?.outOfSelectedDataMap);
+});
+```
+
+## DataZoom and ScrollBar
+
+Both components provide range filtering on continuous axes. Register them and configure in spec:
+
+<CodeGroup>
+```ts DataZoom
+import { VChart, registerBarChart, registerDataZoom } from '@visactor/vchart';
+
+VChart.useRegisters([registerBarChart, registerDataZoom]);
+
+const spec = {
+  type: 'bar',
+  // ...data and field config...
+  dataZoom: [
+    {
+      orient: 'bottom',   // 'bottom' | 'top' | 'left' | 'right'
+      startValue: 0,
+      endValue: 20,
+      filterMode: 'filter' // 'filter' | 'axis'
+    }
+  ]
+};
+```
+
+```ts ScrollBar
+import { VChart, registerLineChart, registerScrollBar } from '@visactor/vchart';
+
+VChart.useRegisters([registerLineChart, registerScrollBar]);
+
+const spec = {
+  type: 'line',
+  // ...data and field config...
+  scrollBar: [
+    {
+      orient: 'bottom',
+      start: 0,
+      end: 0.3
+    }
+  ]
+};
+```
+</CodeGroup>
+
+## Interaction State Visual Encoding
+
+You can customize the visual appearance of each interaction state on series marks using the `state` spec on bar/point/line marks:
+
+```ts
+const spec = {
+  type: 'bar',
+  // ...
+  bar: {
+    state: {
+      highlight: {
+        stroke: '#000',
+        lineWidth: 2,
+        fillOpacity: 1
+      },
+      blur: {
+        fillOpacity: 0.2
+      },
+      selected: {
+        stroke: '#f00',
+        lineWidth: 2
+      }
+    }
+  },
+  interactions: [
+    { type: 'element-highlight' },
+    { type: 'element-select' }
+  ]
+};
+```
+
+## Interaction Events
+
+When interactions fire, VChart emits corresponding events you can subscribe to:
+
+```ts
+// element-highlight events
+vchart.on('element-highlight:start', params => {
+  console.log('Highlighted graphics:', params.graphics);
+});
+
+vchart.on('element-highlight:reset', params => {
+  console.log('Highlight cleared');
+});
+
+// element-select events
+vchart.on('element-select:start', params => {
+  const selectedDatums = params.datums;
+  console.log('Selected:', selectedDatums);
+});
+
+vchart.on('element-select:reset', () => {
+  console.log('Selection cleared');
+});
+```
+
+<Tip>
+  Interaction triggers dispatch `start` and `reset` sub-events in the pattern `{type}:start` and `{type}:reset`. These carry an `InteractionEventParam` with `graphics` (the affected `IMarkGraphic[]`) and `datums` (the corresponding data rows).
+</Tip>

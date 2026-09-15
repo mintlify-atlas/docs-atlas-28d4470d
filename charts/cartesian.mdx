@@ -1,0 +1,433 @@
+---
+title: "Cartesian Charts: Bar, Line, Area, Scatter and More"
+sidebarTitle: "Cartesian"
+description: "Explore VChart's cartesian chart types — bar, line, area, scatter, histogram, rangeColumn, rangeArea, waterfall, heatmap, and mosaic — with spec examples."
+---
+
+Cartesian charts in VChart are drawn on a two-dimensional x/y plane and represent the largest family of chart types in the library. Every cartesian chart maps data fields to a horizontal axis (`xField`) and a vertical axis (`yField`), with optional stacking, grouping, and color encoding through a `seriesField`. Because they all share the same underlying coordinate system you can combine multiple cartesian series in a single `CommonChart` spec or use the dedicated single-type chart APIs shown below.
+
+<Tip>
+  All cartesian chart types support `stack: true` on the series spec to enable stacked rendering. Set `percent: true` alongside `stack: true` to produce a 100 % normalized stack.
+</Tip>
+
+## Registering Cartesian Charts
+
+When using VChart with tree-shaking you must call a registration function before rendering. Import the function that matches the chart type you need:
+
+```ts
+import VChart from '@visactor/vchart';
+import {
+  registerBarChart,
+  registerLineChart,
+  registerAreaChart,
+  registerScatterChart,
+  registerHistogramChart,
+  registerRangeColumnChart,
+  registerRangeAreaChart,
+  registerWaterfallChart,
+  registerHeatmapChart,
+  registerMosaicChart
+} from '@visactor/vchart';
+
+// Register just the charts you use
+registerBarChart();
+registerLineChart();
+```
+
+If you import from `@visactor/vchart` using the default full build (`vchart-all`), all charts are pre-registered and no manual calls are required.
+
+## Chart Types
+
+<AccordionGroup>
+
+<Accordion title="Bar Chart — type: 'bar'">
+
+Bar charts render categorical data as vertical or horizontal rectangular bars whose length encodes a numeric measure. They are the default go-to choice for comparing discrete categories side-by-side.
+
+**Key spec fields**
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | `'bar'` | Chart type identifier |
+| `xField` | `string \| string[]` | Category / band axis field |
+| `yField` | `string \| string[]` | Numeric value field |
+| `seriesField` | `string` | Optional grouping / color field |
+| `stack` | `boolean` | Enable stacking |
+| `direction` | `'vertical' \| 'horizontal'` | Bar orientation |
+
+```ts
+import VChart from '@visactor/vchart';
+import { registerBarChart } from '@visactor/vchart';
+
+registerBarChart();
+
+const spec = {
+  type: 'bar',
+  data: {
+    values: [
+      { month: 'Jan', sales: 120, region: 'North' },
+      { month: 'Jan', sales: 80,  region: 'South' },
+      { month: 'Feb', sales: 150, region: 'North' },
+      { month: 'Feb', sales: 110, region: 'South' }
+    ]
+  },
+  xField: 'month',
+  yField: 'sales',
+  seriesField: 'region',
+  stack: true
+};
+
+const chart = new VChart(spec, { dom: 'chart-container' });
+chart.renderSync();
+```
+
+<Tip>
+  Set `autoBandSize: true` to let VChart automatically compute the band width based on `barWidth` and similar style properties.
+</Tip>
+
+</Accordion>
+
+<Accordion title="Line Chart — type: 'line'">
+
+Line charts connect data points with a continuous line, making trends and changes over time immediately visible. Each series field produces a distinct line series in the same chart region.
+
+**Key spec fields**
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | `'line'` | Chart type identifier |
+| `xField` | `string \| string[]` | Horizontal axis field (often time) |
+| `yField` | `string \| string[]` | Vertical axis field |
+| `seriesField` | `string` | Optional grouping / color field |
+| `activePoint` | `boolean` | Show highlighted point on hover |
+
+```ts
+import { registerLineChart } from '@visactor/vchart';
+
+registerLineChart();
+
+const spec = {
+  type: 'line',
+  data: {
+    values: [
+      { date: '2024-01', revenue: 4200 },
+      { date: '2024-02', revenue: 5800 },
+      { date: '2024-03', revenue: 5100 },
+      { date: '2024-04', revenue: 7200 }
+    ]
+  },
+  xField: 'date',
+  yField: 'revenue'
+};
+```
+
+</Accordion>
+
+<Accordion title="Area Chart — type: 'area'">
+
+Area charts fill the region beneath a line series with color, emphasizing volume or cumulative quantity over time. VChart supports stacked and normalized (100 %) area variants through the same `stack` and `percent` flags.
+
+**Key spec fields**
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | `'area'` | Chart type identifier |
+| `xField` | `string \| string[]` | Horizontal axis field |
+| `yField` | `string \| string[]` | Vertical axis field |
+| `seriesField` | `string` | Optional grouping / color field |
+| `stack` | `boolean` | Stack series areas |
+
+```ts
+import { registerAreaChart } from '@visactor/vchart';
+
+registerAreaChart();
+
+const spec = {
+  type: 'area',
+  data: {
+    values: [
+      { year: '2020', product: 'A', amount: 320 },
+      { year: '2020', product: 'B', amount: 240 },
+      { year: '2021', product: 'A', amount: 480 },
+      { year: '2021', product: 'B', amount: 390 }
+    ]
+  },
+  xField: 'year',
+  yField: 'amount',
+  seriesField: 'product',
+  stack: true
+};
+```
+
+</Accordion>
+
+<Accordion title="Scatter Chart — type: 'scatter'">
+
+Scatter charts display individual data points positioned by two numeric variables, making correlations, clusters, and outliers easy to spot. You can encode additional dimensions through `sizeField` and `shapeField`.
+
+**Key spec fields**
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | `'scatter'` | Chart type identifier |
+| `xField` | `string \| string[]` | Horizontal position field |
+| `yField` | `string \| string[]` | Vertical position field |
+| `seriesField` | `string` | Color grouping field |
+| `sizeField` | `string` | Maps data to symbol size |
+| `size` | `number \| number[]` | Fixed size or `[min, max]` range |
+| `shapeField` | `string` | Maps data to symbol shape |
+
+```ts
+import { registerScatterChart } from '@visactor/vchart';
+
+registerScatterChart();
+
+const spec = {
+  type: 'scatter',
+  data: {
+    values: [
+      { x: 12, y: 38, size: 14, category: 'alpha' },
+      { x: 29, y: 52, size: 22, category: 'beta' },
+      { x: 41, y: 31, size: 9,  category: 'alpha' },
+      { x: 55, y: 64, size: 18, category: 'beta' }
+    ]
+  },
+  xField: 'x',
+  yField: 'y',
+  sizeField: 'size',
+  size: [6, 30],
+  seriesField: 'category'
+};
+```
+
+</Accordion>
+
+<Accordion title="Histogram — type: 'histogram'">
+
+Histograms visualize the distribution of a continuous variable by grouping values into adjacent rectangular bins. Unlike a bar chart, each bar spans a numeric range defined by `xField` (bin start) and `x2Field` (bin end).
+
+**Key spec fields**
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | `'histogram'` | Chart type identifier |
+| `xField` | `string` | Bin lower-bound field |
+| `x2Field` | `string` | Bin upper-bound field |
+| `yField` | `string` | Count / frequency field |
+
+```ts
+import { registerHistogramChart } from '@visactor/vchart';
+
+registerHistogramChart();
+
+const spec = {
+  type: 'histogram',
+  data: {
+    values: [
+      { binStart: 0,  binEnd: 10, count: 5 },
+      { binStart: 10, binEnd: 20, count: 18 },
+      { binStart: 20, binEnd: 30, count: 32 },
+      { binStart: 30, binEnd: 40, count: 27 },
+      { binStart: 40, binEnd: 50, count: 11 }
+    ]
+  },
+  xField: 'binStart',
+  x2Field: 'binEnd',
+  yField: 'count'
+};
+```
+
+</Accordion>
+
+<Accordion title="Range Column Chart — type: 'rangeColumn'">
+
+Range column charts draw bars that span from a minimum to a maximum value rather than from zero to a single value. They are well suited for showing confidence intervals, temperature ranges, and project timelines.
+
+**Key spec fields**
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | `'rangeColumn'` | Chart type identifier |
+| `xField` | `string` | Category axis field |
+| `minField` | `string` | Bar start (lower bound) |
+| `maxField` | `string` | Bar end (upper bound) |
+
+```ts
+import { registerRangeColumnChart } from '@visactor/vchart';
+
+registerRangeColumnChart();
+
+const spec = {
+  type: 'rangeColumn',
+  data: {
+    values: [
+      { month: 'Jan', low: -3,  high: 7  },
+      { month: 'Feb', low: -1,  high: 10 },
+      { month: 'Mar', low: 3,   high: 15 },
+      { month: 'Apr', low: 8,   high: 21 }
+    ]
+  },
+  xField: 'month',
+  minField: 'low',
+  maxField: 'high'
+};
+```
+
+</Accordion>
+
+<Accordion title="Range Area Chart — type: 'rangeArea'">
+
+Range area charts shade the region between a minimum and maximum boundary line series. They communicate uncertainty bands, confidence intervals, or high/low ranges over continuous data.
+
+**Key spec fields**
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | `'rangeArea'` | Chart type identifier |
+| `xField` | `string` | Horizontal axis field |
+| `minField` | `string` | Lower boundary field |
+| `maxField` | `string` | Upper boundary field |
+
+```ts
+import { registerRangeAreaChart } from '@visactor/vchart';
+
+registerRangeAreaChart();
+
+const spec = {
+  type: 'rangeArea',
+  data: {
+    values: [
+      { date: '2024-W01', low: 18, high: 26 },
+      { date: '2024-W02', low: 20, high: 29 },
+      { date: '2024-W03', low: 17, high: 24 },
+      { date: '2024-W04', low: 15, high: 22 }
+    ]
+  },
+  xField: 'date',
+  minField: 'low',
+  maxField: 'high'
+};
+```
+
+</Accordion>
+
+<Accordion title="Waterfall Chart — type: 'waterfall'">
+
+Waterfall charts show how an initial value increases or decreases through a series of intermediate steps before arriving at a final total. Positive increments are rendered in one color and negative increments in another, with an optional running total bar.
+
+**Key spec fields**
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | `'waterfall'` | Chart type identifier |
+| `xField` | `string` | Category axis field |
+| `yField` | `string` | Change / delta field |
+| `total` | `object` | Configuration for the total bar |
+
+```ts
+import { registerWaterfallChart } from '@visactor/vchart';
+
+registerWaterfallChart();
+
+const spec = {
+  type: 'waterfall',
+  data: {
+    values: [
+      { item: 'Starting balance', value: 1000 },
+      { item: 'Revenue',          value: 800  },
+      { item: 'Operating costs',  value: -350 },
+      { item: 'Tax',              value: -120 },
+      { item: 'Net profit',       value: 0, total: true }
+    ]
+  },
+  xField: 'item',
+  yField: 'value',
+  total: {
+    type: 'field',
+    tagField: 'total'
+  }
+};
+```
+
+</Accordion>
+
+<Accordion title="Heatmap — type: 'heatmap'">
+
+Heatmaps encode numeric magnitude as color intensity across a two-dimensional grid of categorical or discrete values. They are commonly used for calendar views, cross-tabulated correlations, and activity matrices.
+
+**Key spec fields**
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | `'heatmap'` | Chart type identifier |
+| `xField` | `string` | Horizontal category field |
+| `yField` | `string` | Vertical category field |
+| `valueField` | `string` | Color-encoded magnitude field |
+
+```ts
+import { registerHeatmapChart } from '@visactor/vchart';
+
+registerHeatmapChart();
+
+const spec = {
+  type: 'heatmap',
+  data: {
+    values: [
+      { day: 'Mon', hour: '9am',  value: 12 },
+      { day: 'Mon', hour: '10am', value: 34 },
+      { day: 'Tue', hour: '9am',  value: 28 },
+      { day: 'Tue', hour: '10am', value: 45 }
+    ]
+  },
+  xField: 'hour',
+  yField: 'day',
+  valueField: 'value',
+  color: {
+    type: 'linear',
+    range: ['#e0f7fa', '#006064']
+  }
+};
+```
+
+</Accordion>
+
+<Accordion title="Mosaic Chart — type: 'mosaic'">
+
+Mosaic charts (also known as Marimekko charts) extend bar charts by varying the *width* of each bar in proportion to a secondary field, producing a two-dimensional area encoding. Each bar's area represents a product of two proportions.
+
+**Key spec fields**
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | `'mosaic'` | Chart type identifier |
+| `xField` | `string \| string[]` | Horizontal grouping field(s) |
+| `yField` | `string \| string[]` | Vertical proportion field |
+| `seriesField` | `string` | Color sub-division field |
+| `bandWidthField` | `string` | Optional explicit width-mapping field |
+
+```ts
+import { registerMosaicChart } from '@visactor/vchart';
+
+registerMosaicChart();
+
+const spec = {
+  type: 'mosaic',
+  data: {
+    values: [
+      { region: 'APAC',   segment: 'Consumer',   share: 0.42 },
+      { region: 'APAC',   segment: 'Enterprise',  share: 0.58 },
+      { region: 'EMEA',   segment: 'Consumer',   share: 0.35 },
+      { region: 'EMEA',   segment: 'Enterprise',  share: 0.65 }
+    ]
+  },
+  xField: ['region', 'segment'],
+  yField: 'share',
+  seriesField: 'segment',
+  stack: true,
+  percent: true
+};
+```
+
+</Accordion>
+
+</AccordionGroup>

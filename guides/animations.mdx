@@ -1,0 +1,310 @@
+---
+title: "Animating VChart Charts: Entrance, Exit and Morph"
+sidebarTitle: "Animations"
+description: "Configure entrance, update, exit, and morph animations in VChart using animationAppear, animationUpdate, animationDisappear, and IMorphConfig."
+---
+
+VChart provides a declarative animation system built on top of the VRender animation engine. Every chart supports up to six distinct animation phases — `appear`, `enter`, `update`, `exit`, `disappear`, and `normal` (looping) — each independently configurable with duration, easing, delay, and per-element stagger. Morph animations let you transition smoothly between different chart types by matching and interpolating graphic elements. All animation functionality is opt-in: you can disable it entirely for maximum performance, or you can register only the animation module when needed.
+
+## Enabling and Disabling Animations
+
+The `animation` flag in `IInitOption` (the second argument to the `VChart` constructor) is a global on/off switch. It defaults to `true`:
+
+```ts
+import { VChart } from '@visactor/vchart';
+
+// Animations enabled (default)
+const chart = new VChart(spec, {
+  dom: 'container',
+  animation: true
+});
+
+// Animations fully disabled — best for static server-side rendering
+const chartStatic = new VChart(spec, {
+  dom: 'container',
+  animation: false
+});
+```
+
+<Note>
+  Setting `animation: false` in `IInitOption` disables **all** animation phases globally, including morph animations, and is the fastest way to eliminate animation overhead in server-side or performance-critical scenarios.
+</Note>
+
+## Registering the Animation Module
+
+When building a minimal bundle with `VChart.useRegisters()`, you must explicitly include `registerAnimate` to unlock animations:
+
+```ts
+import {
+  VChart,
+  registerBarChart,
+  registerCartesianLinearAxis,
+  registerCartesianBandAxis,
+  registerTooltip,
+  registerAnimate
+} from '@visactor/vchart';
+
+VChart.useRegisters([
+  registerBarChart,
+  registerCartesianLinearAxis,
+  registerCartesianBandAxis,
+  registerTooltip,
+  registerAnimate   // enables the full animation pipeline
+]);
+```
+
+## Animation States
+
+The `AnimationStateEnum` defines the lifecycle phases each mark can animate through:
+
+| State | Meaning |
+|---|---|
+| `appear` | Initial entrance when the chart first renders |
+| `enter` | New data points added during an update |
+| `update` | Existing data points change value |
+| `exit` | Data points removed during an update |
+| `disappear` | Chart is removed / torn down |
+| `normal` | Continuous looping animation |
+| `state` | Visual-state transition (e.g. hover → highlight) |
+
+## Chart-Level Animation Spec
+
+Each chart series accepts animation config fields directly on its spec. Use `animationAppear` for entrance, `animationUpdate` for data updates, and `animationDisappear` for teardown:
+
+<Tabs>
+  <Tab title="Boolean shorthand">
+```ts
+const spec = {
+  type: 'bar',
+  data: [{ id: 'sales', values: [
+    { month: 'Jan', value: 120 },
+    { month: 'Feb', value: 95 },
+    { month: 'Mar', value: 140 }
+  ]}],
+  xField: 'month',
+  yField: 'value',
+  // Enable or disable individual phases
+  animationAppear: true,
+  animationUpdate: true,
+  animationDisappear: false
+};
+```
+  </Tab>
+  <Tab title="Preset config">
+```ts
+const spec = {
+  type: 'bar',
+  animationAppear: {
+    preset: 'growHeightIn',   // built-in preset for bars
+    duration: 800,
+    easing: 'cubicOut',
+    delay: 0,
+    oneByOne: true            // stagger elements one by one
+  },
+  animationUpdate: {
+    duration: 400,
+    easing: 'linear'
+  },
+  animationExit: {
+    duration: 300,
+    easing: 'cubicIn'
+  },
+  animationDisappear: {
+    duration: 500,
+    easing: 'cubicInOut'
+  }
+};
+```
+  </Tab>
+  <Tab title="Per-mark config">
+```ts
+const spec = {
+  type: 'bar',
+  // Target specific marks by name (e.g. 'bar', 'label')
+  animationAppear: {
+    bar: {
+      type: 'growHeightIn',
+      duration: 600,
+      easing: 'bounceOut'
+    },
+    label: false  // disable label animation
+  }
+};
+```
+  </Tab>
+</Tabs>
+
+### `IAnimationSpec` Fields Reference
+
+<AccordionGroup>
+  <Accordion title="animationAppear">
+    Controls the initial entrance animation. Accepts `boolean`, a `IStateAnimateSpec` (with `preset`, `duration`, `delay`, `easing`, `oneByOne`), or a per-mark map (`IMarkAnimateSpec`).
+  </Accordion>
+  <Accordion title="animationEnter">
+    Fires when new data is added to an already-rendered chart (e.g. after `vchart.updateData()`). Accepts `boolean`, `ICommonStateAnimateSpec`, or `IMarkAnimateSpec`.
+  </Accordion>
+  <Accordion title="animationUpdate">
+    Fires when existing data points change value. Accepts `boolean`, `ICommonStateAnimateSpec`, or `IMarkAnimateSpec`.
+  </Accordion>
+  <Accordion title="animationExit">
+    Fires when data points are removed from the dataset. Accepts `boolean`, `ICommonStateAnimateSpec`, or `IMarkAnimateSpec`.
+  </Accordion>
+  <Accordion title="animationDisappear">
+    Controls the teardown animation when the chart is released. Also accepts an optional `callBack` for a stage-level animation.
+  </Accordion>
+  <Accordion title="animationNormal">
+    Defines a looping animation (e.g. pulsing, orbiting). Only accepts `IMarkAnimateSpec`; set `loop: true` inside the timeline config.
+  </Accordion>
+  <Accordion title="animationState (since 1.12.0)">
+    Controls the easing and duration of state-transition animations (e.g. hover highlight). Accepts `boolean` or `IStateAnimationConfig` with `duration` and `easing`.
+  </Accordion>
+</AccordionGroup>
+
+## Custom Animation Timelines
+
+For advanced choreography, supply a full `IAnimationTimeline` to describe time slices with per-effect configuration:
+
+```ts
+const spec = {
+  type: 'scatter',
+  animationAppear: {
+    point: {
+      timeSlices: [
+        {
+          effects: {
+            type: 'fadeIn'
+          },
+          duration: 300,
+          delay: 0
+        },
+        {
+          effects: {
+            type: 'scaleIn',
+            options: { direction: 'both' }
+          },
+          duration: 400,
+          delay: 0
+        }
+      ],
+      oneByOne: 30,   // stagger 30 ms between elements
+      loop: false
+    }
+  }
+};
+```
+
+## Morph Animations Between Chart Types
+
+Morph animations smoothly interpolate graphic elements when transitioning between chart types. Pass an `IMorphConfig` as the second argument to `renderSync()` or `updateSpecSync()`:
+
+```ts
+import { VChart } from '@visactor/vchart';
+
+const barSpec = {
+  type: 'bar',
+  data: [{ id: 'data', values: [
+    { category: 'A', value: 30 },
+    { category: 'B', value: 55 },
+    { category: 'C', value: 42 }
+  ]}],
+  xField: 'category',
+  yField: 'value'
+};
+
+const vchart = new VChart(barSpec, { dom: 'container' });
+vchart.renderSync();
+
+// Transition to a pie chart with morph
+const pieSpec = {
+  type: 'pie',
+  data: [{ id: 'data', values: [
+    { category: 'A', value: 30 },
+    { category: 'B', value: 55 },
+    { category: 'C', value: 42 }
+  ]}],
+  categoryField: 'category',
+  valueField: 'value'
+};
+
+vchart.updateSpecSync(pieSpec, undefined, {
+  morph: true,
+  morphAll: true,
+  reuse: false,
+  enableExitAnimation: true,
+  animation: {
+    duration: 800,
+    easing: 'cubicInOut',
+    oneByOne: false
+  }
+});
+```
+
+### `IMorphConfig` Fields
+
+<AccordionGroup>
+  <Accordion title="morph: boolean">
+    Master switch for morphing. Set to `true` to enable element-level morph transitions.
+  </Accordion>
+  <Accordion title="morphAll: boolean">
+    When `true`, forces all marks to participate in morphing, even those without explicit `morphKey` mappings.
+  </Accordion>
+  <Accordion title="reuse: boolean">
+    Whether to reuse the existing grammar/compile context. Set to `false` when switching chart types.
+  </Accordion>
+  <Accordion title="enableExitAnimation: boolean">
+    When `true`, marks that have no morph target will play their `disappear` animation before being removed.
+  </Accordion>
+  <Accordion title="animation: IMorphAnimationConfig">
+    Fine-tune the morph animation with `easing`, `duration`, `delay`, `oneByOne`, and `splitPath` options.
+  </Accordion>
+</AccordionGroup>
+
+### Series-Level Morph Config
+
+Individual series can declare morph matching keys via the `morph` field on their spec:
+
+```ts
+const spec = {
+  type: 'common',
+  series: [
+    {
+      type: 'bar',
+      data: [{ id: 'revenue', values: [...] }],
+      xField: 'quarter',
+      yField: 'revenue',
+      morph: {
+        enable: true,
+        morphKey: 'revenue',       // match by this key across chart transitions
+        morphElementKey: 'quarter' // match individual bars by this datum field
+      }
+    }
+  ]
+};
+```
+
+## Animation Lifecycle Hook Events
+
+VChart emits `HOOK_EVENT` values during the animation pipeline. Subscribe using `vchart.on()`:
+
+```ts
+vchart.on('allAnimationStart', () => {
+  console.log('All animations started');
+});
+
+vchart.on('allAnimationEnd', () => {
+  console.log('All animations finished');
+  // Safe to take a screenshot here
+});
+
+vchart.on('animationStart', () => {
+  console.log('A mark animation started');
+});
+
+vchart.on('animationEnd', () => {
+  console.log('A mark animation ended');
+});
+```
+
+<Tip>
+  Use `vchart.on('animationFinished', ...)` (a `ChartEvent`) to be notified when every animation across the entire chart has completed. This is the best hook for post-render screenshots, PDF export, or image caching pipelines.
+</Tip>

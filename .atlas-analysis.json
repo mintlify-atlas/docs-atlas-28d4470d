@@ -1,0 +1,156 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "VChart",
+  "projectDescription": "VChart is a cross-platform charting library that wraps a visual grammar engine to deliver expressive, animated, and narrative data visualizations for browsers, Node.js, and mini-program environments.",
+  "theme": "luma",
+  "primaryColor": "#006be5",
+  "lightColor": "#040404",
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/spec",
+              "concepts/data",
+              "concepts/series-and-marks",
+              "concepts/components",
+              "concepts/themes"
+            ]
+          },
+          {
+            "group": "Chart Types",
+            "pages": [
+              "charts/cartesian",
+              "charts/polar",
+              "charts/hierarchy",
+              "charts/relationship",
+              "charts/3d-charts"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/interactions",
+              "guides/animations",
+              "guides/events",
+              "guides/cross-platform",
+              "guides/react-vchart",
+              "guides/performance"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "VChart Instance",
+            "pages": [
+              "api/vchart-class",
+              "api/render-and-update",
+              "api/events-api",
+              "api/theme-api"
+            ]
+          },
+          {
+            "group": "Spec Options",
+            "pages": [
+              "api/common-spec",
+              "api/axis-spec",
+              "api/legend-spec",
+              "api/tooltip-spec",
+              "api/marker-spec"
+            ]
+          },
+          {
+            "group": "Extension & Plugins",
+            "pages": [
+              "api/vchart-extension",
+              "api/custom-mark",
+              "api/register-functions"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "25+ built-in chart types including bar, line, pie, scatter, map, sankey, treemap, sunburst, word cloud, and more",
+    "Cross-platform support for browser, Node.js, WeChat Mini Program, Lark Mini App, Taro, and Harmony",
+    "Rich animation system with entrance, exit, and update animations plus morph transitions",
+    "Comprehensive interaction model: hover, select, highlight, brush, data zoom, and scroll bar",
+    "Declarative JSON spec API for easy configuration and serialization",
+    "Theming system with built-in light/dark themes and full customization via token-based design",
+    "React, OpenInula, and Taro component wrappers for framework integration",
+    "3D chart variants: bar-3d, pie-3d, funnel-3d, histogram-3d, word-cloud-3d",
+    "Extension charts: ranking bar, candlestick, storyline, pictogram, image cloud, and more",
+    "Tree-shakable architecture with fine-grained register functions for minimal bundle size"
+  ],
+  "publicApiSurface": [
+    "VChart (default export, core class)",
+    "VChart.prototype.renderSync(morphConfig?)",
+    "VChart.prototype.renderAsync(morphConfig?)",
+    "VChart.prototype.release()",
+    "VChart.prototype.updateSpec(spec, forceMerge?, option?)",
+    "VChart.prototype.updateData(id, data, options?)",
+    "VChart.prototype.resize(width, height)",
+    "VChart.prototype.on(eventType, handler)",
+    "VChart.prototype.off(eventType, handler?)",
+    "VChart.prototype.setCurrentTheme(name)",
+    "VChart.prototype.getLegendSelectedDataByIndex(index?)",
+    "VChart.prototype.getDataURL()",
+    "VChart.prototype.exportImg(name?)",
+    "VChart.prototype.exportCanvas()",
+    "VChart.prototype.getStage()",
+    "VChart.prototype.getChart()",
+    "VChart.prototype.getComponents()",
+    "VChart.prototype.convertDatumToPosition(datum, dataLinkInfo?, isRelativeToCanvas?)",
+    "VChart.prototype.convertValueToPosition(value, dataLinkInfo?, isRelativeToCanvas?)",
+    "VChart.prototype.setDimensionIndex(value, opt?)",
+    "VChart.useRegisters(comps[])",
+    "VChart.useChart(charts[])",
+    "VChart.useSeries(series[])",
+    "VChart.useComponent(components[])",
+    "VChart.registerMap(key, source, option?)",
+    "VChart.registerTheme(name, theme)",
+    "VChart.ThemeManager",
+    "VChart.InstanceManager",
+    "registerBrowserEnv()",
+    "registerNodeEnv()",
+    "registerLarkEnv()",
+    "registerWXEnv()",
+    "registerTaroEnv()",
+    "registerHarmonyEnv()",
+    "registerLineChart()",
+    "registerBarChart()",
+    "registerPieChart()",
+    "registerScatterChart()",
+    "registerAreaChart()",
+    "registerRadarChart()",
+    "registerMapChart()",
+    "registerHeatmapChart()",
+    "registerSankeyChart()",
+    "registerTreemapChart()",
+    "registerSunburstChart()",
+    "registerWordCloudChart()",
+    "registerFunnelChart()",
+    "registerGaugeChart()",
+    "registerWaterfallChart()",
+    "registerBoxplotChart()",
+    "ISpec (TypeScript type)",
+    "IInitOption (TypeScript type)",
+    "IVChart (TypeScript interface)"
+  ]
+}

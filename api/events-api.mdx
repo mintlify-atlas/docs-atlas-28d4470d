@@ -1,0 +1,428 @@
+---
+title: "VChart Event API: on, off, and Event Types"
+sidebarTitle: "Events API"
+description: "Reference for VChart's on/off event listener API, the full EventType catalogue, EventQuery filter shape, and ExtendEventParam callback fields."
+---
+
+VChart's event system is built on a hierarchical dispatcher that propagates events upward through four bubble levels — **mark → model → chart → vchart** — mirroring the structure of the chart's scene graph. Every user interaction (pointer, mouse, touch, drag, gesture) and every internal chart lifecycle moment (layout, animation, data update) emits a typed event you can subscribe to with `on`. The `EventQuery` object lets you narrow subscriptions precisely: listen only on a specific series type, a named mark, a user-defined component `id`, or within a chosen bubble level — without extra filtering code inside your handler.
+
+---
+
+## `on(eventType, handler)` and `on(eventType, query, handler)`
+
+Subscribes to an event. VChart provides two overloads: one without a query filter and one with.
+
+<Tabs>
+  <Tab title="Without query">
+    ```ts
+    chart.on(eventType: EventType, handler: EventCallback<ExtendEventParam>): void
+    ```
+
+    The handler fires for **every** occurrence of `eventType` regardless of which chart element triggered it.
+
+    <ParamField path="eventType" type="EventType" required>
+      Any string from the `EventType` union — a DOM-style event name, a `ChartEvent` key, a `HOOK_EVENT` key, or any custom string.
+    </ParamField>
+
+    <ParamField path="handler" type="(params: ExtendEventParam) => boolean | void" required>
+      Callback invoked when the event fires. Return `true` to stop propagation.
+    </ParamField>
+
+    ```ts
+    chart.on('click', (params) => {
+      console.log('clicked datum:', params.datum);
+    });
+    ```
+  </Tab>
+  <Tab title="With query">
+    ```ts
+    chart.on(
+      eventType: EventType,
+      query: EventQuery,
+      handler: EventCallback<ExtendEventParam>
+    ): void
+    ```
+
+    The handler fires only when the event satisfies **all** conditions in `query`.
+
+    <ParamField path="eventType" type="EventType" required>
+      The event name to subscribe to.
+    </ParamField>
+
+    <ParamField path="query" type="EventQuery" required>
+      A filter object. All provided fields must match for the handler to be called. See [EventQuery](#eventquery) below.
+    </ParamField>
+
+    <ParamField path="handler" type="(params: ExtendEventParam) => boolean | void" required>
+      Callback invoked on matching events.
+    </ParamField>
+
+    ```ts
+    // Only fire when clicking a bar mark on the first bar series
+    chart.on('click', { type: 'bar', level: 'mark' }, (params) => {
+      console.log('bar clicked:', params.datum);
+    });
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## `off(eventType, handler?)`
+
+Removes one or all handlers for a given event type.
+
+<ParamField path="eventType" type="EventType" required>
+  The event name to unsubscribe from.
+</ParamField>
+
+<ParamField path="handler" type="EventCallback<ExtendEventParam>">
+  When provided, removes only the specific handler reference. When omitted, **all** handlers registered for `eventType` on this instance are removed.
+</ParamField>
+
+```ts
+const handleClick = (params) => { /* ... */ };
+
+chart.on('click', handleClick);
+// later...
+chart.off('click', handleClick); // remove just this handler
+// or
+chart.off('click'); // remove ALL click handlers
+```
+
+---
+
+## EventQuery
+
+The `EventQuery` object filters which events reach your handler. Every field is optional — supply only the fields you care about.
+
+<ParamField path="level" type="'vchart' | 'chart' | 'model' | 'mark'">
+  Restricts the event to a specific bubble level in the hierarchy:
+  - `'mark'` — triggered by a specific graphic primitive
+  - `'model'` — triggered by a series, region, or component model
+  - `'chart'` — triggered at the chart level
+  - `'vchart'` — triggered at the outermost VChart instance level (default for most chart lifecycle events)
+</ParamField>
+
+<ParamField path="source" type="'chart' | 'window' | 'canvas'">
+  Restricts the event to its physical origin:
+  - `'chart'` — events originating from chart graphics
+  - `'window'` — events originating from `window`
+  - `'canvas'` — events originating from the canvas element
+</ParamField>
+
+<ParamField path="nodeName" type="string">
+  Matches by the internal VRender graphic node name.
+</ParamField>
+
+<ParamField path="markName" type="string">
+  Matches by the mark's name as declared in the spec (via the `name` field on extension or custom marks).
+</ParamField>
+
+<ParamField path="type" type="EventTargetType">
+  When `level` is `'mark'` or `'model'`, filters by the mark or model **type** string:
+  - Mark types: `'line'`, `'area'`, `'rect'`, `'arc'`, `'symbol'`, `'text'`, `'rule'`, etc.
+  - Component types: `'axis'`, `'legend'`, `'tooltip'`, `'dataZoom'`, `'markLine'`, `'markArea'`, `'markPoint'`, `'indicator'`, `'title'`, `'label'`, `'totalLabel'`
+  - Series types: `'bar'`, `'line'`, `'pie'`, `'scatter'`, `'area'`, etc.
+</ParamField>
+
+<ParamField path="id" type="string | number">
+  Matches the `id` (user-defined identifier) of the target model or mark, as set in the spec.
+</ParamField>
+
+<ParamField path="filter" type="(params: Partial<BaseEventParams>) => boolean">
+  Custom predicate function for fine-grained filtering not covered by the other fields.
+</ParamField>
+
+<ParamField path="throttle" type="number">
+  Throttle the handler to fire at most once per `throttle` milliseconds.
+</ParamField>
+
+<ParamField path="debounce" type="number">
+  Debounce the handler — delay firing until `debounce` milliseconds after the last event.
+</ParamField>
+
+<ParamField path="consume" type="boolean">
+  When `true`, stops the event from bubbling further up the hierarchy after this handler runs.
+</ParamField>
+
+---
+
+## ExtendEventParam (Callback Parameter)
+
+All event handlers receive an `ExtendEventParam` object. Fields are populated based on the event type — not every field is set for every event.
+
+<ParamField path="event" type="Event">
+  The original browser or synthetic DOM event object.
+</ParamField>
+
+<ParamField path="value" type="any">
+  Arbitrary value carried by the event. Used by chart lifecycle events (e.g. the current theme name on a theme-change event).
+</ParamField>
+
+<ParamField path="mark" type="IMark">
+  The VChart `IMark` instance that triggered the event (set for `level: 'mark'` events).
+</ParamField>
+
+<ParamField path="model" type="IModel">
+  The chart model (series, region, component) that owns the mark.
+</ParamField>
+
+<ParamField path="chart" type="IChart">
+  The internal `IChart` instance associated with the event.
+</ParamField>
+
+<ParamField path="datum" type="Datum">
+  The data record bound to the graphic element that was interacted with. Extremely useful for building custom tooltips or drill-down interactions.
+</ParamField>
+
+<ParamField path="node" type="IGraphic">
+  The raw VRender graphic node (`IGraphic`) that received the event.
+</ParamField>
+
+<ParamField path="vchart" type="IVChart">
+  The VChart instance. Populated for lifecycle events such as `rendered`, `initialized`, `animationFinished`, `layoutStart`, and `layoutEnd`.
+</ParamField>
+
+<ParamField path="item" type="IMarkGraphic">
+  The individual mark graphic element (VRender `IMarkGraphic`). Provides access to shape attributes, bounds, and animation state.
+</ParamField>
+
+<ParamField path="source" type="'chart' | 'window' | 'canvas'">
+  The physical source of the event.
+</ParamField>
+
+---
+
+## Event Type Reference
+
+### Pointer Events
+
+Pointer events unify mouse and touch input and are the recommended way to handle cross-device interactions.
+
+| Event | Description |
+|---|---|
+| `pointerdown` | Pointer button pressed |
+| `pointerup` | Pointer button released |
+| `pointerupoutside` | Pointer released outside the element |
+| `pointertap` | Pointer tap (equivalent to `click` for pointer events) |
+| `pointerover` | Pointer moved over element |
+| `pointermove` | Pointer moved while over element |
+| `pointerenter` | Pointer entered element (no bubbling) |
+| `pointerleave` | Pointer left element (no bubbling) |
+| `pointerout` | Pointer left element or a descendant |
+
+### Mouse Events
+
+| Event | Description |
+|---|---|
+| `mousedown` | Mouse button pressed |
+| `mouseup` | Mouse button released |
+| `mouseupoutside` | Mouse released outside element |
+| `rightdown` | Right mouse button pressed |
+| `rightup` | Right mouse button released |
+| `rightupoutside` | Right button released outside |
+| `click` | Left click |
+| `dblclick` | Double click |
+| `mousemove` | Mouse moved |
+| `mouseover` | Mouse moved over element |
+| `mouseout` | Mouse left element or descendant |
+| `mouseenter` | Mouse entered element (no bubbling) |
+| `mouseleave` | Mouse left element (no bubbling) |
+| `wheel` | Mouse wheel scrolled |
+
+### Touch Events
+
+| Event | Description |
+|---|---|
+| `touchstart` | Touch contact started |
+| `touchend` | Touch contact ended |
+| `touchendoutside` | Touch ended outside element |
+| `touchmove` | Touch contact moved |
+| `touchcancel` | Touch interrupted |
+| `tap` | Single tap gesture |
+
+### Drag Events
+
+| Event | Description |
+|---|---|
+| `dragstart` | Drag operation started |
+| `drag` | Drag in progress |
+| `dragenter` | Dragged item entered element |
+| `dragleave` | Dragged item left element |
+| `dragover` | Dragged item over element |
+| `dragend` | Drag operation ended |
+| `drop` | Item dropped on element |
+
+### Gesture Events
+
+| Event | Description |
+|---|---|
+| `pan` | Pan (single-finger drag) in progress |
+| `panstart` | Pan started |
+| `panend` | Pan ended |
+| `press` | Long press held |
+| `pressup` | Long press released |
+| `pressend` | Long press ended |
+| `pinch` | Pinch zoom in progress |
+| `pinchstart` | Pinch started |
+| `pinchend` | Pinch ended |
+| `swipe` | Swipe gesture detected |
+
+### Chart Lifecycle Events (`ChartEvent`)
+
+These events fire for chart-level state changes. Use `chart.on('rendered', ...)` to detect render completion, or `chart.on('layoutEnd', ...)` to react once layout is calculated.
+
+<Accordion title="Lifecycle & render events">
+| Event string | Description |
+|---|---|
+| `initialized` | Chart instance fully initialised (fires once) |
+| `rendered` | Chart render method called for the first time |
+| `renderFinished` | Each canvas draw cycle completed (fires repeatedly) |
+| `animationFinished` | All animations on the stage have ended |
+| `afterResize` | Chart finished a resize operation |
+| `afterRender` | Every render pass completed |
+| `layoutStart` | Layout calculation started |
+| `layoutEnd` | Layout calculation finished |
+| `afterLayout` | Layout applied to scene graph |
+| `afterMarkLayoutEnd` | Mark-level layout phase ended |
+</Accordion>
+
+<Accordion title="Component interaction events">
+| Event string | Description |
+|---|---|
+| `legendSelectedDataChange` | Legend selection changed |
+| `legendFilter` | Legend triggered a data filter |
+| `legendItemClick` | A legend item was clicked |
+| `legendItemHover` | A legend item was hovered |
+| `legendItemUnHover` | Hover left a legend item |
+| `tooltipShow` | Tooltip became visible |
+| `tooltipHide` | Tooltip hidden |
+| `tooltipRelease` | Tooltip fully released |
+| `dataZoomChange` | Data zoom range changed |
+| `scrollBarChange` | Scroll bar position changed |
+| `brushStart` | Brush selection started |
+| `brushChange` | Brush selection changed |
+| `brushEnd` | Brush selection ended |
+| `brushClear` | Brush selection cleared |
+| `brushActive` | Brush activated |
+| `drill` | Hierarchy drill-down triggered |
+</Accordion>
+
+<Accordion title="Player & dimension events">
+| Event string | Description |
+|---|---|
+| `playerPlay` | Player component started playback |
+| `playerPause` | Player paused |
+| `playerEnd` | Player reached the end |
+| `playerChange` | Player frame changed |
+| `playerForward` | Player stepped forward |
+| `playerBackward` | Player stepped backward |
+| `dimensionHover` | Dimension hover activated (crosshair + tooltip) |
+| `dimensionClick` | Dimension clicked |
+</Accordion>
+
+<Accordion title="Series data events">
+| Event string | Description |
+|---|---|
+| `afterInitData` | Series data initialised |
+| `rawDataUpdate` | Raw data updated |
+| `viewDataUpdate` | Processed view data updated |
+| `viewDataFilterOver` | View data filter pass completed |
+| `viewDataStatisticsUpdate` | Statistics recalculated |
+| `scaleDomainUpdate` | Scale domain changed |
+| `scaleUpdate` | Scale instance updated |
+</Accordion>
+
+### Internal Hook Events (`HOOK_EVENT`)
+
+Hook events expose the VGrammar/VRender rendering pipeline. They are primarily useful for performance profiling and advanced customisation.
+
+<Accordion title="Hook event list">
+| Event key | Fired when |
+|---|---|
+| `beforeEvaluateData` | Before data evaluation pass |
+| `afterEvaluateData` | After data evaluation |
+| `beforeEvaluateScale` | Before scale evaluation |
+| `afterEvaluateScale` | After scale evaluation |
+| `beforeParseView` | Before VGrammar view parse |
+| `afterParseView` | After view parse |
+| `beforeTransform` | Before a data transform runs |
+| `afterTransform` | After a transform completes |
+| `beforeCreateVRenderStage` | Before VRender stage creation |
+| `afterCreateVRenderStage` | After stage created |
+| `beforeVRenderDraw` | Before VRender draw call |
+| `afterVRenderDraw` | After VRender draw call |
+| `beforeMarkJoin` | Before mark join phase |
+| `afterMarkJoin` | After mark join |
+| `beforeMarkUpdate` | Before mark update |
+| `afterMarkUpdate` | After mark update |
+| `beforeMarkEncode` | Before mark encode |
+| `afterMarkEncode` | After mark encode |
+| `beforeDoLayout` | Before layout calculation |
+| `afterDoLayout` | After layout |
+| `beforeDoRender` | Before render pass |
+| `afterDoRender` | After render pass |
+| `animationStart` | Animation started |
+| `animationEnd` | Animation ended |
+| `elementAnimationStart` | Element-level animation started |
+| `elementAnimationEnd` | Element-level animation ended |
+| `allAnimationStart` | All animations started |
+| `allAnimationEnd` | All animations ended |
+</Accordion>
+
+---
+
+## Examples
+
+<CodeGroup>
+
+```ts Click on a bar with query filtering
+import VChart from '@visactor/vchart';
+
+const chart = new VChart(spec, { dom: 'container' });
+chart.renderSync();
+
+// Listen for clicks only on bar marks
+chart.on('click', { level: 'mark', type: 'bar' }, (params) => {
+  const { datum, event } = params;
+  console.log('Clicked bar datum:', datum);
+  console.log('Native event:', event);
+});
+```
+
+```ts Respond to chart lifecycle events
+chart.on('rendered', (params) => {
+  console.log('Chart rendered for the first time');
+});
+
+chart.on('animationFinished', () => {
+  console.log('All entry animations complete — safe to export');
+});
+
+chart.on('layoutEnd', (params) => {
+  console.log('Layout finished, regions:', params.elements);
+});
+```
+
+```ts Throttled mousemove with dimension activation
+chart.on(
+  'mousemove',
+  { throttle: 50, source: 'chart' },
+  (params) => {
+    // params.datum is populated when hovering over a data graphic
+    if (params.datum) {
+      chart.setDimensionIndex(params.datum.x, { tooltip: true });
+    }
+  }
+);
+```
+
+```ts Listen to legend selection changes
+chart.on('legendSelectedDataChange', (params) => {
+  const selectedItems = chart.getLegendSelectedDataByIndex(0);
+  console.log('Currently selected legend items:', selectedItems);
+});
+```
+
+</CodeGroup>
